@@ -132,7 +132,17 @@ img { max-width: 100%; display: block; }
 .btn-card.primary:hover:not(:disabled) { background: var(--gold); color: var(--ink); border-color: var(--gold); }
 .btn-card.soldout { background: var(--surface); color: var(--ink-faint); border-color: var(--line); }
 .btn-card.soldout:hover { background: var(--ink); color: var(--gold-light); border-color: var(--ink); }
-.btn-card .wa-icon { flex-shrink: 0; }
+.btn-card .wa-icon, .btn-card .ig-icon { flex-shrink: 0; }
+.btn-card.ig {
+  flex: 0 0 auto;
+  padding: 11px 14px;
+  background: transparent;
+  color: var(--ink-soft);
+  border-color: var(--line);
+}
+.btn-card.ig:hover { background: var(--gold); color: var(--choco-deep); border-color: var(--gold); }
+.card-actions { gap: 6px; flex-wrap: wrap; }
+.card-actions .btn-card.primary { flex: 1 1 auto; min-width: 130px; }
 
 /* ===== PAGINATION ===== */
 .pager-wrap { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 6px; padding: 36px 16px 20px; }
