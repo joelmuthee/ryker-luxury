@@ -151,7 +151,7 @@ img { max-width: 100%; display: block; }
 .shop-card a { color: var(--gold-deep); font-weight: 600; }
 .shop-map { margin-top: 18px; box-shadow: var(--shadow); border-radius: 10px; overflow: hidden; }
 .shop-map iframe { display: block; }
-.footer-shop { font-size: 13px; color: var(--ink-soft); }
+.footer-shop { font-size: 13px; color: #d4c0a0; }
 .steps { list-style: none; counter-reset: step; }
 .steps li { counter-increment: step; padding: 14px 0 14px 50px; position: relative; border-bottom: 1px solid var(--line); color: var(--ink-soft); }
 .steps li::before { content: counter(step); position: absolute; left: 0; top: 14px; width: 32px; height: 32px; border-radius: 50%; background: var(--ink); color: var(--gold); display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 600; }
