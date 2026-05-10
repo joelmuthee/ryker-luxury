@@ -41,9 +41,8 @@ img { max-width: 100%; display: block; }
   width: min(1200px, 92%); margin: 0 auto; padding: 14px 0;
 }
 .brand { display: flex; align-items: center; gap: 12px; color: #fff; }
-.brand-logo { width: 52px; height: 52px; border-radius: 10px; border: 1px solid rgba(184,149,106,0.35); object-fit: cover; background: var(--choco-deep); }
-.footer-brand .brand-logo { width: 60px; height: 60px; }
-.brand-text { font-family: var(--serif); font-size: 22px; font-weight: 600; letter-spacing: 0.04em; color: var(--gold-light); }
+.brand-logo { height: 56px; width: auto; max-width: 320px; display: block; object-fit: contain; }
+.footer-brand .brand-logo { height: 80px; max-width: 380px; }
 .nav-links { display: flex; gap: 32px; align-items: center; }
 .nav-links a { color: #f0e9d8; font-size: 14px; font-weight: 500; letter-spacing: 0.02em; transition: color 0.2s; }
 .nav-links a:hover { color: var(--gold); }
@@ -320,8 +319,8 @@ img { max-width: 100%; display: block; }
 /* ===== MOBILE ===== */
 @media (max-width: 760px) {
   .nav-inner { padding: 10px 0; }
-  .brand-logo { width: 44px; height: 44px; }
-  .brand-text { font-size: 19px; }
+  .brand-logo { height: 42px; max-width: 240px; }
+  .footer-brand .brand-logo { height: 64px; max-width: 280px; }
   .hero { padding: 60px 16px 70px; }
   .hero-eyebrow { font-size: 10px; letter-spacing: 0.26em; margin-bottom: 20px; }
   .hero-title { font-size: clamp(44px, 12vw, 66px); margin-bottom: 18px; }
