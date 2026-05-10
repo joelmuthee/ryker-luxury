@@ -1,5 +1,5 @@
 // Ryker Luxury Admin
-const ADMIN_PASSWORD = 'ryker2026';
+const ADMIN_PASSWORD = 'ryker123';
 const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
 const ADMIN_TOKEN = atob('cnlrZXItYWRtaW4tdG9rZW4tMjAyNi1zZWN1cmU=');
 
