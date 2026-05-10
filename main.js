@@ -41,12 +41,10 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
   function availSizes(item) {
     if (!item.stock || Object.keys(item.stock).length === 0) return [];
     const hasSales = (item.sales || []).length > 0;
-    if (!hasSales) {
-      // Pre-launch: stock not yet configured — show all listed sizes as "potentially available"
-      return Object.keys(item.stock);
-    }
-    // Post-launch: only show sizes that actually have stock left
-    return Object.entries(item.stock).filter(([, q]) => q > 0).map(([s]) => s);
+    const sizes = !hasSales
+      ? Object.keys(item.stock)
+      : Object.entries(item.stock).filter(([, q]) => q > 0).map(([s]) => s);
+    return sizes.sort(sortSize);
   }
 
   function isSoldOut(item) {
@@ -286,11 +284,20 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
   lightbox.addEventListener('click', e => { if (e.target === lightbox) closeLightbox(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
 
-  // Mobile nav
+  // Mobile nav — toggle classes on both elements so hamburger animates to X
   const navToggle = document.getElementById('navToggle');
   const navLinks = document.getElementById('navLinks');
-  navToggle?.addEventListener('click', () => navLinks.classList.toggle('open'));
-  navLinks?.querySelectorAll('a').forEach(a => a.addEventListener('click', () => navLinks.classList.remove('open')));
+  navToggle?.addEventListener('click', () => {
+    const open = navLinks.classList.toggle('open');
+    navToggle.classList.toggle('open', open);
+    document.body.style.overflow = open ? 'hidden' : '';
+    navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+  });
+  navLinks?.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+    navLinks.classList.remove('open');
+    navToggle.classList.remove('open');
+    document.body.style.overflow = '';
+  }));
 
   document.getElementById('year').textContent = new Date().getFullYear();
 

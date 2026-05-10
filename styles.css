@@ -56,11 +56,15 @@ img { max-width: 100%; display: block; }
   .nav-toggle { display: flex; }
   .nav-links {
     position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(42,28,15,0.98); flex-direction: column; justify-content: center; align-items: center; gap: 28px;
-    transform: translateY(-100vh); transition: transform 0.3s; z-index: 210; visibility: hidden;
+    background: var(--choco-deep); flex-direction: column; justify-content: center; align-items: center; gap: 32px;
+    transform: translateY(-100vh); transition: transform 0.32s ease; z-index: 210; visibility: hidden;
   }
   .nav-links.open { transform: translateY(0); visibility: visible; }
-  .nav-links a { font-size: 20px; }
+  .nav-links a { font-size: 22px; font-weight: 500; }
+  /* Hamburger → X transform when menu open */
+  .nav-toggle.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  .nav-toggle.open span:nth-child(2) { opacity: 0; }
+  .nav-toggle.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 }
 
 /* ===== HERO ===== */
@@ -141,7 +145,11 @@ img { max-width: 100%; display: block; }
 }
 .btn-card.ig:hover { background: var(--gold); color: var(--choco-deep); border-color: var(--gold); }
 .card-actions { gap: 6px; flex-wrap: wrap; }
-.card-actions .btn-card.primary { flex: 1 1 auto; min-width: 130px; }
+.card-actions .btn-card.primary { flex: 1 1 auto; min-width: 110px; }
+@media (max-width: 760px) {
+  .card-actions .btn-card.primary { min-width: 0; }
+  .card-actions .btn-card.ig { padding: 9px 8px; }
+}
 
 /* ===== PAGINATION ===== */
 .pager-wrap { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 6px; padding: 36px 16px 20px; }
@@ -318,23 +326,48 @@ img { max-width: 100%; display: block; }
 
 /* ===== MOBILE ===== */
 @media (max-width: 760px) {
-  .nav-inner { padding: 10px 0; }
-  .brand-logo { height: 42px; max-width: 240px; }
-  .footer-brand .brand-logo { height: 64px; max-width: 280px; }
-  .hero { padding: 60px 16px 70px; }
-  .hero-eyebrow { font-size: 10px; letter-spacing: 0.26em; margin-bottom: 20px; }
-  .hero-title { font-size: clamp(44px, 12vw, 66px); margin-bottom: 18px; }
-  .hero-sub { font-size: 16px; margin-bottom: 28px; }
+  .nav-inner { padding: 8px 0; }
+  .brand-logo { height: 50px; max-width: 260px; }
+  .footer-brand .brand-logo { height: 70px; max-width: 300px; }
+  .hero { padding: 48px 16px 56px; }
+  .hero-eyebrow { font-size: 10px; letter-spacing: 0.24em; margin-bottom: 16px; }
+  .hero-title { font-size: clamp(42px, 11vw, 60px); margin-bottom: 16px; }
+  .hero-sub { font-size: 15.5px; margin-bottom: 26px; line-height: 1.5; }
   .hero-cta { gap: 10px; }
   .btn { padding: 13px 22px; font-size: 13px; }
   .filters { padding: 40px 0 16px; }
   .section-title { font-size: clamp(32px, 9vw, 44px); }
+  /* Single-row horizontal scroll for filter pills on mobile (cleaner than wrap) */
+  .filter-pills--cats, .filter-pills--sizes {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    padding-bottom: 6px;
+    /* Bleed to edges so the row indicates scrollability */
+    margin-left: -16px;
+    margin-right: -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+    scrollbar-width: thin;
+  }
+  .filters-bar { width: 100%; }
+  .filters-bar .filter-pills { width: auto; }
+  .filter-pills--cats::-webkit-scrollbar, .filter-pills--sizes::-webkit-scrollbar { height: 3px; }
+  .filter-pills--cats::-webkit-scrollbar-thumb, .filter-pills--sizes::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 99px; }
+  .filter-pills--cats .pill, .filter-pills--sizes .pill { flex-shrink: 0; scroll-snap-align: start; }
   .gallery { grid-template-columns: 1fr 1fr; gap: 14px; padding: 12px 0 50px; }
-  .card-body { padding: 12px 14px 14px; gap: 7px; }
-  .card-title { font-size: 17px; }
-  .card-price { font-size: 18px; }
-  .card-actions { gap: 6px; padding-top: 10px; margin-top: 10px; }
-  .btn-card { padding: 10px 8px; font-size: 12px; }
+  .card-body { padding: 11px 12px 12px; gap: 6px; }
+  .card-title { font-size: 16px; line-height: 1.2; }
+  .card-desc { font-size: 12px; line-height: 1.45; -webkit-line-clamp: 2; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+  .card-price { font-size: 17px; }
+  .card-price small { font-size: 11px; }
+  .card-actions { gap: 5px; padding-top: 8px; margin-top: 8px; }
+  .btn-card { padding: 9px 6px; font-size: 11.5px; gap: 4px; }
+  .btn-card .wa-icon, .btn-card .ig-icon { width: 13px; height: 13px; }
+  .size-chip { font-size: 10.5px; padding: 2px 7px; }
+  .badge-cat { font-size: 9px; padding: 3px 8px; }
+  .badge-sold { font-size: 10px; padding: 5px 10px; }
   .info { padding: 56px 0; }
   .info h2 { font-size: 28px; margin-bottom: 14px; }
   .steps li { padding: 12px 0 12px 46px; font-size: 14px; }
