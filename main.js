@@ -40,12 +40,23 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
 
   function availSizes(item) {
     if (!item.stock || Object.keys(item.stock).length === 0) return [];
+    const hasSales = (item.sales || []).length > 0;
+    if (!hasSales) {
+      // Pre-launch: stock not yet configured — show all listed sizes as "potentially available"
+      return Object.keys(item.stock);
+    }
+    // Post-launch: only show sizes that actually have stock left
     return Object.entries(item.stock).filter(([, q]) => q > 0).map(([s]) => s);
   }
 
   function isSoldOut(item) {
-    if (!item.stock || Object.keys(item.stock).length === 0) return false; // unconfigured = available
-    return Object.values(item.stock).every(q => (q || 0) === 0);
+    // Only "sold out" if real sales have happened AND every size is at 0.
+    // A freshly-seeded item with size placeholders at 0 is NOT sold out.
+    if (!item.stock || Object.keys(item.stock).length === 0) return false;
+    const allZero = Object.values(item.stock).every(q => (q || 0) === 0);
+    if (!allZero) return false;
+    const hasSales = (item.sales || []).length > 0;
+    return hasSales;
   }
 
   function whatsappLink(item, soldOut) {
