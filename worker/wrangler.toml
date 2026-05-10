@@ -1,0 +1,11 @@
+name = "rykerluxury-api"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+account_id = "58685495706b973821d77208248c66fc"
+
+[[kv_namespaces]]
+binding = "BAGS"
+id = "3d298b091a304e208674360285820c8f"
+
+# Auth token set as a secret — never committed:
+#   npx wrangler secret put ADMIN_TOKEN

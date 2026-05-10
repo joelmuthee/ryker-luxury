@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls \"C:/Users/Joel/Website Designs/\")",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_in_Chrome__navigate",
+      "mcp__Claude_in_Chrome__javascript_tool",
+      "Bash(npx wrangler *)",
+      "Bash(CLOUDFLARE_ACCOUNT_ID=58685495706b973821d77208248c66fc npx wrangler kv namespace create \"rykerluxury-bags\")",
+      "Bash(npm install *)",
+      "Bash(CLOUDFLARE_ACCOUNT_ID=58685495706b973821d77208248c66fc npx wrangler deploy)",
+      "Bash(CLOUDFLARE_ACCOUNT_ID=58685495706b973821d77208248c66fc npx wrangler secret put ADMIN_TOKEN)"
+    ]
+  }
+}

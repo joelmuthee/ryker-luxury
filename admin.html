@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ryker Luxury · Admin</title>
+<link rel="icon" type="image/png" sizes="32x32" href="images/logo.jpg">
+<link rel="apple-touch-icon" sizes="180x180" href="images/logo.jpg">
+<meta name="theme-color" content="#0d0d0d">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=1">
+<script src="https://www.google.com/recaptcha/enterprise.js?render=6LeDBFwpAAAAAJe8ux9-imrqZ2ueRsEtdiWoDDpX" async defer></script>
+</head>
+<body style="background:#f8f6f2;">
+
+<!-- LOGIN -->
+<div id="loginScreen" class="login-wrap">
+  <h1>Ryker Admin</h1>
+  <p>Enter your admin password</p>
+  <div class="field">
+    <label>Password</label>
+    <input id="loginPassword" type="password" autocomplete="current-password">
+  </div>
+  <button class="btn-admin primary" id="loginBtn" style="width:100%">Sign in</button>
+  <p id="loginError" style="color:#b00020;font-size:13px;text-align:center;margin-top:12px;display:none;">Wrong password</p>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="admin-wrap" style="display:none;">
+
+  <div class="admin-header">
+    <h1>Ryker Luxury Admin</h1>
+    <div class="admin-actions">
+      <a class="btn-admin" href="index.html" target="_blank">View store →</a>
+      <button class="btn-admin danger" id="logoutBtn">Logout</button>
+    </div>
+  </div>
+
+  <!-- ====== SALES DASHBOARD ====== -->
+  <section class="dash" id="salesDash">
+    <h2 class="dash-title">Sales Overview</h2>
+    <div class="kpi-grid" id="kpiGrid"></div>
+    <div class="dash-grid">
+      <div class="dash-card">
+        <h3>Top categories</h3>
+        <div id="topCats" class="cat-bars"></div>
+      </div>
+      <div class="dash-card">
+        <h3>Recent sales</h3>
+        <div id="recentSales" class="recent-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== INVENTORY DASHBOARD ====== -->
+  <section class="dash" id="invDash">
+    <h2 class="dash-title">Inventory Overview</h2>
+    <div class="inv-kpi-grid" id="invKpiGrid"></div>
+    <div class="section-divider">Stock levels <span id="invSortLabel">sorted by stock (low → high)</span></div>
+    <div class="inv-table-wrap">
+      <table class="inv-table" id="invTable">
+        <thead>
+          <tr>
+            <th style="width:50px"></th>
+            <th>Item</th>
+            <th>Category</th>
+            <th>Price</th>
+            <th>Stock by size</th>
+            <th>Total</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="invTableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ====== ADD / EDIT ITEM ====== -->
+  <div class="admin-form">
+    <h2 id="formTitle">Add a new item</h2>
+    <input type="hidden" id="editingId">
+
+    <div class="field">
+      <label>Item image</label>
+      <input id="imageInput" type="file" accept="image/*">
+      <div id="imagePreview" style="margin-top:10px;"></div>
+      <p style="font-size:12px;color:#999;margin-top:6px;">Square crop recommended · ~1080×1080.</p>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Item name</label>
+        <input id="nameInput" type="text" placeholder="e.g. Slim-Fit White Polo Shirt" required>
+      </div>
+      <div class="field">
+        <label>Category</label>
+        <select id="categoryInput">
+          <option value="">— Select category —</option>
+          <optgroup label="Clothing">
+            <option value="Tshirts">Tshirts</option>
+            <option value="Shirts">Shirts</option>
+            <option value="Polos">Polos</option>
+            <option value="Jeans">Jeans</option>
+            <option value="Shorts">Shorts</option>
+            <option value="Joggers">Joggers</option>
+            <option value="Tracksuits">Tracksuits</option>
+            <option value="Hoodies">Hoodies</option>
+            <option value="Jackets">Jackets</option>
+            <option value="Suits">Suits</option>
+          </optgroup>
+          <optgroup label="Footwear">
+            <option value="Shoes">Shoes</option>
+            <option value="Sneakers">Sneakers</option>
+            <option value="Boots">Boots</option>
+          </optgroup>
+          <optgroup label="Accessories">
+            <option value="Caps">Caps</option>
+            <option value="Belts">Belts</option>
+            <option value="Watches">Watches</option>
+            <option value="Jewellery">Jewellery</option>
+            <option value="Rings">Rings</option>
+            <option value="Chains">Chains</option>
+            <option value="Earrings">Earrings</option>
+            <option value="Accessories">Accessories</option>
+          </optgroup>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Description</label>
+      <textarea id="descInput" placeholder="Tap 'Suggest' or write your own..."></textarea>
+      <button class="btn-admin" id="aiBtn" type="button" style="margin-top:8px;">✨ Suggest description</button>
+    </div>
+
+    <div class="field">
+      <label>Price (Ksh)</label>
+      <input id="priceInput" type="number" min="0" step="50" placeholder="2500" style="max-width:200px;">
+    </div>
+
+    <!-- STOCK ENTRY -->
+    <div class="field">
+      <label>Stock per size <small style="font-weight:400;color:#999;">(enter 0 or leave blank = no stock for that size)</small></label>
+
+      <div class="stock-entry-group">
+        <label class="group-label">Standard</label>
+        <div class="stock-entry-row" id="stockStandard">
+          <div class="stock-entry-item"><span class="size-lbl">XS</span><input type="number" min="0" step="1" data-size="XS" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">S</span><input type="number" min="0" step="1" data-size="S" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">M</span><input type="number" min="0" step="1" data-size="M" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">L</span><input type="number" min="0" step="1" data-size="L" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">XL</span><input type="number" min="0" step="1" data-size="XL" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">XXL</span><input type="number" min="0" step="1" data-size="XXL" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">3XL</span><input type="number" min="0" step="1" data-size="3XL" class="stock-qty"></div>
+        </div>
+      </div>
+
+      <div class="stock-entry-group" style="margin-top:10px;">
+        <label class="group-label">Numeric (jeans / shorts waist)</label>
+        <div class="stock-entry-row" id="stockNumeric">
+          <div class="stock-entry-item"><span class="size-lbl">28</span><input type="number" min="0" step="1" data-size="28" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">30</span><input type="number" min="0" step="1" data-size="30" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">32</span><input type="number" min="0" step="1" data-size="32" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">34</span><input type="number" min="0" step="1" data-size="34" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">36</span><input type="number" min="0" step="1" data-size="36" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">38</span><input type="number" min="0" step="1" data-size="38" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">40</span><input type="number" min="0" step="1" data-size="40" class="stock-qty"></div>
+        </div>
+      </div>
+
+      <div class="stock-entry-group" style="margin-top:10px;">
+        <label class="group-label">Shoes (UK)</label>
+        <div class="stock-entry-row" id="stockShoes">
+          <div class="stock-entry-item"><span class="size-lbl">UK6</span><input type="number" min="0" step="1" data-size="UK6" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">UK7</span><input type="number" min="0" step="1" data-size="UK7" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">UK8</span><input type="number" min="0" step="1" data-size="UK8" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">UK9</span><input type="number" min="0" step="1" data-size="UK9" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">UK10</span><input type="number" min="0" step="1" data-size="UK10" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">UK11</span><input type="number" min="0" step="1" data-size="UK11" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">UK12</span><input type="number" min="0" step="1" data-size="UK12" class="stock-qty"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-actions">
+      <button class="btn-admin primary" id="saveBtn">Save item</button>
+      <button class="btn-admin" id="cancelBtn" style="display:none;">Cancel edit</button>
+    </div>
+  </div>
+
+  <!-- ====== ITEM LIST ====== -->
+  <div class="section-divider">All items <span id="bagCount">0</span></div>
+  <div class="admin-list" id="adminList"></div>
+
+</div><!-- /dashboard -->
+
+<div class="toast" id="toast"></div>
+
+<!-- SALE MODAL -->
+<div id="saleModal" class="modal" style="display:none;">
+  <div class="modal-card">
+    <h3 id="saleModalTitle">Record a sale</h3>
+    <p class="sub">Reduce stock and optionally save buyer details for remarketing.</p>
+
+    <div class="field">
+      <label>Size sold</label>
+      <select id="saleSizeInput"></select>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Quantity</label>
+        <input id="saleQtyInput" type="number" min="1" value="1">
+      </div>
+      <div class="field">
+        <label>Sale price (Ksh) <small style="font-weight:400;color:#999;">optional override</small></label>
+        <input id="salePriceInput" type="number" min="0" step="50">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Buyer name <small style="font-weight:400;color:#999;">optional</small></label>
+      <input id="buyerName" type="text" placeholder="e.g. Brian Kamau">
+    </div>
+    <div class="field">
+      <label>Buyer phone <small style="font-weight:400;color:#999;">optional</small></label>
+      <input id="buyerPhone" type="tel" placeholder="254712345678">
+    </div>
+    <div class="field">
+      <label>Notes <small style="font-weight:400;color:#999;">optional</small></label>
+      <input id="buyerNotes" type="text" placeholder="Delivery address, payment method...">
+    </div>
+
+    <div class="admin-actions" style="margin-top:18px;">
+      <button class="btn-admin gold" id="saleSaveBtn">Record sale</button>
+      <button class="btn-admin danger" id="saleCancelBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESTOCK MODAL -->
+<div id="restockModal" class="modal" style="display:none;">
+  <div class="modal-card">
+    <h3 id="restockModalTitle">Restock item</h3>
+    <p class="sub">Add units to existing stock.</p>
+    <div class="field">
+      <label>Size</label>
+      <select id="restockSizeInput"></select>
+    </div>
+    <div class="field">
+      <label>Units to add</label>
+      <input id="restockQtyInput" type="number" min="1" value="1">
+    </div>
+    <div class="admin-actions" style="margin-top:18px;">
+      <button class="btn-admin primary" id="restockSaveBtn">Add stock</button>
+      <button class="btn-admin danger" id="restockCancelBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="admin.js?v=1"></script>
+</body>
+</html>
