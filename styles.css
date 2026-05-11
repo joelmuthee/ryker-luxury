@@ -312,9 +312,12 @@ img { max-width: 100%; display: block; }
 .modal-card p.sub { color: #666; font-size: 14px; margin-bottom: 18px; }
 
 /* Login */
-.login-wrap { max-width: 400px; margin: 100px auto; padding: 40px; background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
-.login-wrap h1 { font-family: var(--serif); font-size: 32px; margin-bottom: 8px; text-align: center; }
+.login-wrap { max-width: 440px; margin: 100px auto; padding: 44px 40px 40px; background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+.login-wrap h1 { font-family: var(--serif); font-size: 34px; margin-bottom: 8px; text-align: center; }
 .login-wrap p { color: var(--ink-faint); font-size: 14px; text-align: center; margin-bottom: 24px; }
+.login-wrap .field input { padding: 16px 18px; font-size: 16px; letter-spacing: 0.06em; }
+.login-wrap .field label { font-size: 13px; }
+.login-wrap .btn-admin { padding: 14px 18px; font-size: 15px; }
 
 /* Toast */
 .toast { position: fixed; bottom: 24px; right: 24px; background: var(--ink); color: var(--gold-light); padding: 12px 20px; border-radius: 8px; box-shadow: var(--shadow-lg); transform: translateY(120%); transition: 0.3s; z-index: 2000; font-size: 14px; }
