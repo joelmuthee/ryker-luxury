@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#3d2817">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=9">
+<link rel="stylesheet" href="styles.css?v=11">
 <script src="https://www.google.com/recaptcha/enterprise.js?render=6LeDBFwpAAAAAJe8ux9-imrqZ2ueRsEtdiWoDDpX" async defer></script>
 </head>
 <body style="background:#f8f6f2;">
@@ -92,6 +92,16 @@
     <h2 id="formTitle">Add a new item</h2>
     <input type="hidden" id="editingId">
 
+    <!-- IG quick-add -->
+    <div class="field ig-quick-add">
+      <label>⚡ Quick-add from Instagram <small style="font-weight:400;color:#999;">— paste an IG post or reel URL to auto-fill the image and caption</small></label>
+      <div class="ig-quick-row">
+        <input id="igQuickInput" type="url" placeholder="https://www.instagram.com/p/...">
+        <button class="btn-admin primary" id="igQuickBtn" type="button">Fetch</button>
+      </div>
+      <p id="igQuickStatus" class="ig-quick-status"></p>
+    </div>
+
     <div class="field">
       <label>Item image</label>
       <input id="imageInput" type="file" accept="image/*">
@@ -145,9 +155,18 @@
       <button class="btn-admin" id="aiBtn" type="button" style="margin-top:8px;">✨ Suggest description</button>
     </div>
 
-    <div class="field">
-      <label>Price (Ksh)</label>
-      <input id="priceInput" type="number" min="0" step="50" placeholder="2500" style="max-width:200px;">
+    <div class="field-row">
+      <div class="field">
+        <label>Price (Ksh)</label>
+        <input id="priceInput" type="number" min="0" step="50" placeholder="2500">
+      </div>
+      <div class="field">
+        <label>Branch <small style="font-weight:400;color:#999;">(optional — leave blank if same stock at every shop)</small></label>
+        <select id="branchInput">
+          <option value="">All branches</option>
+          <option value="Legend Valley">Legend Valley · Gitanga Road</option>
+        </select>
+      </div>
     </div>
 
     <!-- STOCK ENTRY -->
@@ -211,7 +230,17 @@
   </div>
 
   <!-- ====== ITEM LIST ====== -->
-  <div class="section-divider" id="allItems">All items <span id="bagCount">0</span></div>
+  <div class="section-divider" id="allItems">
+    All items <span id="bagCount">0</span>
+    <button class="btn-admin" style="margin-left:auto;font-size:12px;padding:6px 12px;" onclick="bulkSelectAll()">Select all</button>
+  </div>
+  <!-- Bulk action bar — shows when items are selected -->
+  <div class="bulk-bar" id="bulkActions" style="display:none;">
+    <span><strong id="bulkCount">0</strong> selected</span>
+    <button class="btn-admin" onclick="bulkSetCategory()">Set category</button>
+    <button class="btn-admin danger" onclick="bulkDelete()">Delete</button>
+    <button class="btn-admin" onclick="bulkClear()">Clear</button>
+  </div>
   <div class="admin-list" id="adminList"></div>
 
 </div><!-- /dashboard -->
@@ -279,6 +308,6 @@
   </div>
 </div>
 
-<script src="admin.js?v=3"></script>
+<script src="admin.js?v=4"></script>
 </body>
 </html>

@@ -117,6 +117,59 @@ imageInput.addEventListener('change', e => {
   reader.readAsDataURL(file);
 });
 
+// ====== IG QUICK-ADD ======
+// State: when a user fetches via IG, we hold the post URL so it's saved on the item.
+let stagedInstagramUrl = '';
+
+document.getElementById('igQuickBtn')?.addEventListener('click', async () => {
+  const url = document.getElementById('igQuickInput').value.trim();
+  const status = document.getElementById('igQuickStatus');
+  if (!url) { status.textContent = 'Paste an Instagram URL first.'; status.className = 'ig-quick-status err'; return; }
+  if (!/instagram\.com\/(?:p|reel|tv)\//i.test(url)) { status.textContent = 'That doesn\'t look like an IG post URL.'; status.className = 'ig-quick-status err'; return; }
+
+  status.textContent = 'Fetching from Instagram…';
+  status.className = 'ig-quick-status';
+
+  try {
+    const r = await fetch(`${API_BASE}/api/ig-fetch?url=${encodeURIComponent(url)}`);
+    const data = await r.json();
+    if (!r.ok || data.error) throw new Error(data.error || 'Fetch failed');
+
+    // Download the IG image bytes through the browser, stage them as if uploaded
+    const imgRes = await fetch(data.imageUrl);
+    if (!imgRes.ok) throw new Error('Image download failed');
+    const blob = await imgRes.blob();
+    const reader = new FileReader();
+    await new Promise((resolve, reject) => {
+      reader.onload = () => {
+        const dataUrl = reader.result;
+        stagedImage = { base64: dataUrl.split(',')[1], ext: 'jpg', dataUrl };
+        imagePreview.innerHTML = `<img src="${dataUrl}" style="max-width:180px;border-radius:8px;margin-top:4px;">`;
+        resolve();
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+
+    // Auto-fill description from caption (strip the "username" prefix some IG embeds add)
+    const cap = (data.caption || '').replace(/^[a-z0-9._]+\s+/i, '').trim();
+    document.getElementById('descInput').value = cap;
+
+    // Suggest a name from the first sentence
+    if (!document.getElementById('nameInput').value && cap) {
+      const firstLine = cap.split(/[.!?\n]/)[0].trim().slice(0, 60);
+      document.getElementById('nameInput').value = firstLine.charAt(0).toUpperCase() + firstLine.slice(1);
+    }
+
+    stagedInstagramUrl = data.postUrl;
+    status.textContent = '✓ Image and caption loaded. Review the name, category, price and stock, then Save.';
+    status.className = 'ig-quick-status ok';
+  } catch (err) {
+    status.textContent = '✗ ' + err.message + ' — paste image and write description manually instead.';
+    status.className = 'ig-quick-status err';
+  }
+});
+
 // ====== STOCK READ/WRITE ======
 function getStockFromForm() {
   const stock = {};
@@ -188,6 +241,7 @@ async function saveItem() {
   const price = parseInt(document.getElementById('priceInput').value, 10);
   const desc = document.getElementById('descInput').value.trim();
   const category = document.getElementById('categoryInput').value || '';
+  const branch = document.getElementById('branchInput')?.value || '';
   const stock = getStockFromForm();
 
   if (!name) { showToast('Item name is required.'); return; }
@@ -208,6 +262,7 @@ async function saveItem() {
       bag.category = category;
       bag.description = desc;
       bag.price = price;
+      bag.branch = branch || undefined;
       bag.stock = { ...bag.stock, ...stock };
       // Remove sizes set to 0 if they are explicitly cleared in the form
       document.querySelectorAll('.stock-qty').forEach(inp => {
@@ -222,7 +277,10 @@ async function saveItem() {
     } else {
       if (!stagedImage) { showToast('Add an item image.'); setSaving(false); return; }
       const id = 'item_' + Date.now();
-      bags.unshift({ id, name, category, description: desc, price, stock, sales: [], image: imagePath, createdAt: new Date().toISOString() });
+      const newBag = { id, name, category, description: desc, price, stock, sales: [], image: imagePath, createdAt: new Date().toISOString() };
+      if (stagedInstagramUrl) newBag.instagramUrl = stagedInstagramUrl;
+      if (branch) newBag.branch = branch;
+      bags.unshift(newBag);
       await apiPublish();
       showToast('Item added and live!');
     }
@@ -245,10 +303,17 @@ function resetForm() {
   document.getElementById('categoryInput').value = '';
   document.getElementById('descInput').value = '';
   document.getElementById('priceInput').value = '';
+  const br = document.getElementById('branchInput');
+  if (br) br.value = '';
   clearStockForm();
   imageInput.value = '';
   imagePreview.innerHTML = '';
   stagedImage = null;
+  stagedInstagramUrl = '';
+  const igInput = document.getElementById('igQuickInput');
+  if (igInput) igInput.value = '';
+  const igStatus = document.getElementById('igQuickStatus');
+  if (igStatus) { igStatus.textContent = ''; igStatus.className = 'ig-quick-status'; }
   document.getElementById('formTitle').textContent = 'Add a new item';
   document.getElementById('cancelBtn').style.display = 'none';
 }
@@ -262,6 +327,8 @@ function editItem(id) {
   document.getElementById('categoryInput').value = bag.category || '';
   document.getElementById('descInput').value = bag.description || '';
   document.getElementById('priceInput').value = bag.price;
+  const br = document.getElementById('branchInput');
+  if (br) br.value = bag.branch || '';
   setStockToForm(bag.stock || {});
   stagedImage = null;
   imagePreview.innerHTML = `<img src="${bag.image}" style="max-width:180px;border-radius:8px;">`;
@@ -623,17 +690,24 @@ function renderInventory() {
 }
 
 // ====== ITEM LIST ======
+let bulkSelected = new Set();
+
 function renderList() {
   const list = document.getElementById('adminList');
   document.getElementById('bagCount').textContent = bags.length;
   const navCount = document.getElementById('navItemCount');
   if (navCount) navCount.textContent = bags.length;
+  renderBulkBar();
   list.innerHTML = bags.map(bag => {
     const units = totalStock(bag);
     const sold = totalUnitsSold(bag);
     const stockSummary = Object.entries(bag.stock || {}).map(([sz, q]) => `${sz}:${q}`).join(' · ') || 'No stock set';
+    const checked = bulkSelected.has(bag.id);
     return `
-    <div class="admin-card">
+    <div class="admin-card ${checked ? 'bulk-selected' : ''}">
+      <label class="bulk-check" title="Select for bulk actions">
+        <input type="checkbox" data-bulk="${escapeHtml(bag.id)}" ${checked ? 'checked' : ''}>
+      </label>
       <img src="${bag.image}" alt="${escapeHtml(bag.name)}">
       <div class="admin-card-body">
         <div class="admin-card-name">${escapeHtml(bag.name)}</div>
@@ -649,6 +723,62 @@ function renderList() {
       </div>
     </div>`;
   }).join('');
+
+  // Wire up the new checkboxes
+  list.querySelectorAll('input[data-bulk]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      if (cb.checked) bulkSelected.add(cb.dataset.bulk);
+      else bulkSelected.delete(cb.dataset.bulk);
+      cb.closest('.admin-card').classList.toggle('bulk-selected', cb.checked);
+      renderBulkBar();
+    });
+  });
+}
+
+function renderBulkBar() {
+  const bar = document.getElementById('bulkActions');
+  if (!bar) return;
+  if (bulkSelected.size === 0) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  document.getElementById('bulkCount').textContent = bulkSelected.size;
+}
+
+function bulkClear() { bulkSelected.clear(); renderList(); }
+
+function bulkSelectAll() {
+  bags.forEach(b => bulkSelected.add(b.id));
+  renderList();
+}
+
+async function bulkDelete() {
+  if (!confirm(`Delete ${bulkSelected.size} item(s)? This cannot be undone.`)) return;
+  bags = bags.filter(b => !bulkSelected.has(b.id));
+  bulkSelected.clear();
+  try {
+    await apiPublish();
+    renderList();
+    renderInventory();
+    renderDashboard();
+    showToast(`Deleted.`);
+  } catch (err) {
+    showToast('Sync failed: ' + err.message);
+  }
+}
+
+async function bulkSetCategory() {
+  const cat = prompt('Set category for selected items to:\n(use exact name e.g. Polos, Shirts, Jeans, Caps)');
+  if (!cat) return;
+  bags.forEach(b => { if (bulkSelected.has(b.id)) b.category = cat; });
+  try {
+    await apiPublish();
+    renderList();
+    renderInventory();
+    showToast(`Set ${bulkSelected.size} item(s) to "${cat}".`);
+    bulkSelected.clear();
+    renderList();
+  } catch (err) {
+    showToast('Sync failed: ' + err.message);
+  }
 }
 
 // ====== INIT ======
@@ -656,6 +786,10 @@ window.editItem = editItem;
 window.deleteItem = deleteItem;
 window.openSaleModal = openSaleModal;
 window.openRestockModal = openRestockModal;
+window.bulkClear = bulkClear;
+window.bulkSelectAll = bulkSelectAll;
+window.bulkDelete = bulkDelete;
+window.bulkSetCategory = bulkSetCategory;
 
 async function init() {
   showToast('Loading…');

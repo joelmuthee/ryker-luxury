@@ -16,6 +16,7 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
   let currentAvail = 'all';
   let currentCat = 'all';
   let currentSize = 'all';
+  let currentBranch = 'all';
   let currentSort = 'default';
   let currentSearch = '';
   let currentPage = 1;
@@ -121,6 +122,27 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     return [...all].sort(sortSize);
   }
 
+  function buildBranchPills() {
+    const branchPills = document.getElementById('branchPills');
+    if (!branchPills) return;
+    const branches = [...new Set(items.map(i => i.branch).filter(Boolean))].sort();
+    if (branches.length < 2) { branchPills.innerHTML = ''; branchPills.style.display = 'none'; return; }
+    branchPills.style.display = '';
+    branchPills.innerHTML = [
+      `<button class="pill pill--branch ${currentBranch === 'all' ? 'active' : ''}" data-branch="all">All branches</button>`,
+      ...branches.map(b => `<button class="pill pill--branch ${currentBranch === b ? 'active' : ''}" data-branch="${escapeHtml(b)}">📍 ${escapeHtml(b)}</button>`)
+    ].join('');
+    branchPills.querySelectorAll('.pill--branch').forEach(p => {
+      p.addEventListener('click', () => {
+        branchPills.querySelectorAll('.pill--branch').forEach(x => x.classList.remove('active'));
+        p.classList.add('active');
+        currentBranch = p.dataset.branch;
+        currentPage = 1;
+        render();
+      });
+    });
+  }
+
   function buildCatPills() {
     const cats = getCategories();
     if (!cats.length) { catPills.innerHTML = ''; return; }
@@ -177,6 +199,7 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
   const IG_SVG = `<svg class="ig-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>`;
 
   function render() {
+    buildBranchPills();
     buildCatPills();
     buildSizePills();
 
@@ -192,7 +215,8 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
       const soldOut = isSoldOut(item);
       const availOk = currentAvail === 'all' || (currentAvail === 'sold' ? soldOut : !soldOut);
       const catOk = currentCat === 'all' || item.category === currentCat;
-      return availOk && catOk && sizeMatch(item) && searchMatch(item);
+      const branchOk = currentBranch === 'all' || (item.branch || '') === currentBranch || !item.branch;
+      return availOk && catOk && branchOk && sizeMatch(item) && searchMatch(item);
     });
 
     // Sort

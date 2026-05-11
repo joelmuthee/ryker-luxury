@@ -469,6 +469,25 @@ html { scroll-behavior: smooth; }
 .restock-btn { padding: 4px 10px; font-size: 11px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; background: #fff; font-family: inherit; transition: 0.15s; }
 .restock-btn:hover { background: var(--ink); color: #fff; border-color: var(--ink); }
 
+/* IG quick-add panel */
+.ig-quick-add {
+  background: linear-gradient(135deg, #fff8ec, #f5e9d3);
+  border: 1px solid var(--gold-light);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+.ig-quick-row { display: flex; gap: 8px; margin-top: 6px; }
+.ig-quick-row input {
+  flex: 1; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px;
+  font-family: inherit; font-size: 14px; background: #fff; color: var(--ink);
+}
+.ig-quick-row input:focus { outline: none; border-color: var(--gold); }
+.ig-quick-row .btn-admin { flex-shrink: 0; }
+.ig-quick-status { font-size: 12.5px; margin: 8px 0 0; min-height: 18px; }
+.ig-quick-status.ok { color: #1a7a40; }
+.ig-quick-status.err { color: #b00020; }
+
 /* Admin item form */
 .admin-form { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 24px; margin-bottom: 24px; }
 .admin-form h2 { font-family: var(--serif); font-size: 24px; margin-bottom: 18px; }
@@ -492,9 +511,27 @@ html { scroll-behavior: smooth; }
 .stock-entry-item .size-lbl { font-size: 11px; font-weight: 700; color: var(--ink-soft); }
 .stock-entry-item input[type="number"] { width: 56px; text-align: center; padding: 7px 6px; font-size: 13px; }
 
+/* Bulk action bar */
+.bulk-bar {
+  position: sticky; top: 64px; z-index: 40;
+  display: flex; align-items: center; gap: 10px;
+  background: var(--choco-deep); color: var(--gold-light);
+  padding: 10px 14px; border-radius: 10px; margin-bottom: 12px;
+  box-shadow: var(--shadow);
+}
+.bulk-bar strong { font-size: 18px; font-family: var(--serif); color: var(--gold); margin-right: 4px; }
+.bulk-bar .btn-admin { padding: 6px 12px; font-size: 12.5px; }
+
 /* Admin list */
 .admin-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
-.admin-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.admin-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; position: relative; transition: 0.2s; }
+.admin-card.bulk-selected { box-shadow: 0 0 0 3px var(--gold); border-color: var(--gold); }
+.bulk-check {
+  position: absolute; top: 8px; left: 8px; z-index: 2;
+  background: rgba(255,255,255,0.92); border-radius: 4px; padding: 4px;
+  cursor: pointer; display: flex;
+}
+.bulk-check input { width: 18px; height: 18px; cursor: pointer; accent-color: var(--gold-deep); }
 .admin-card img { width: 100%; aspect-ratio: 1; object-fit: cover; }
 .admin-card-body { padding: 12px 14px; }
 .admin-card-name { font-family: var(--serif); font-size: 16px; font-weight: 600; margin-bottom: 4px; }

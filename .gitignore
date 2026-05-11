@@ -1,4 +1,7 @@
 worker/node_modules/
+.claude/
+.wrangler/
+node_modules/
 .tmp/
 *.log
 .DS_Store
