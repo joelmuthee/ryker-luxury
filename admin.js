@@ -56,7 +56,7 @@ async function apiPublish() {
   const res = await fetch(`${API_BASE}/api/bulk`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ADMIN_TOKEN}` },
-    body: JSON.stringify({ bags, settings }),
+    body: JSON.stringify({ bags, settings, sets }),
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Save failed: ${res.status}`); }
 }
@@ -66,6 +66,7 @@ async function loadData() {
   const json = await res.json();
   bags = json.bags || [];
   settings = json.settings || {};
+  sets = json.sets || [];
 }
 
 // ====== HELPERS ======
@@ -101,7 +102,7 @@ function totalRevenue(item) {
   return allSales(item).reduce((s, r) => s + (Number(r.salePrice || item.price) * (Number(r.qty) || 1)), 0);
 }
 
-// ====== IMAGE ======
+// ====== IMAGES ======
 const imageInput = document.getElementById('imageInput');
 const imagePreview = document.getElementById('imagePreview');
 imageInput.addEventListener('change', e => {
@@ -116,6 +117,55 @@ imageInput.addEventListener('change', e => {
   };
   reader.readAsDataURL(file);
 });
+
+// Additional images: array of { base64, ext, dataUrl } OR { url } (already-uploaded)
+let stagedExtras = [];
+const extraImagesInput = document.getElementById('extraImagesInput');
+const extraImagesPreview = document.getElementById('extraImagesPreview');
+
+function readFileAsStaged(file) {
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      resolve({ base64: dataUrl.split(',')[1], ext, dataUrl });
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+extraImagesInput?.addEventListener('change', async e => {
+  const files = [...e.target.files];
+  for (const f of files) {
+    if (stagedExtras.length >= 8) break;
+    try {
+      const staged = await readFileAsStaged(f);
+      stagedExtras.push(staged);
+    } catch (_) {}
+  }
+  renderExtraImagesPreview();
+  e.target.value = ''; // allow re-selecting the same file
+});
+
+function renderExtraImagesPreview() {
+  if (!extraImagesPreview) return;
+  if (!stagedExtras.length) { extraImagesPreview.innerHTML = ''; return; }
+  extraImagesPreview.innerHTML = stagedExtras.map((s, i) => `
+    <div class="extra-img-thumb">
+      <img src="${s.dataUrl || s.url}" alt="Additional image ${i + 1}">
+      <button class="extra-img-remove" data-extra-remove="${i}" aria-label="Remove" title="Remove">×</button>
+    </div>
+  `).join('');
+  extraImagesPreview.querySelectorAll('[data-extra-remove]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.extraRemove, 10);
+      stagedExtras.splice(idx, 1);
+      renderExtraImagesPreview();
+    });
+  });
+}
 
 // ====== IG QUICK-ADD ======
 // State: when a user fetches via IG, we hold the post URL so it's saved on the item.
@@ -135,21 +185,35 @@ document.getElementById('igQuickBtn')?.addEventListener('click', async () => {
     const data = await r.json();
     if (!r.ok || data.error) throw new Error(data.error || 'Fetch failed');
 
-    // Download the IG image bytes through the browser, stage them as if uploaded
-    const imgRes = await fetch(data.imageUrl);
-    if (!imgRes.ok) throw new Error('Image download failed');
-    const blob = await imgRes.blob();
-    const reader = new FileReader();
-    await new Promise((resolve, reject) => {
-      reader.onload = () => {
-        const dataUrl = reader.result;
-        stagedImage = { base64: dataUrl.split(',')[1], ext: 'jpg', dataUrl };
-        imagePreview.innerHTML = `<img src="${dataUrl}" style="max-width:180px;border-radius:8px;margin-top:4px;">`;
-        resolve();
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
+    // Download the cover (first image) through the browser, stage as main image
+    async function downloadAndStage(url) {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error('Image download failed');
+      const blob = await r.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result;
+          resolve({ base64: dataUrl.split(',')[1], ext: 'jpg', dataUrl });
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    stagedImage = await downloadAndStage(data.imageUrl);
+    imagePreview.innerHTML = `<img src="${stagedImage.dataUrl}" style="max-width:180px;border-radius:8px;margin-top:4px;">`;
+
+    // If carousel, download additional images too
+    stagedExtras = [];
+    const extras = (data.imageUrls || []).slice(1);
+    if (extras.length) {
+      status.textContent = `Downloading ${extras.length} more image${extras.length === 1 ? '' : 's'}…`;
+      for (const u of extras) {
+        try { stagedExtras.push(await downloadAndStage(u)); } catch (_) {}
+      }
+      renderExtraImagesPreview();
+    }
 
     // Auto-fill description from caption (strip the "username" prefix some IG embeds add)
     const cap = (data.caption || '').replace(/^[a-z0-9._]+\s+/i, '').trim();
@@ -255,6 +319,17 @@ async function saveItem() {
       imagePath = await apiUploadImage(stagedImage.base64, stagedImage.ext);
     }
 
+    // Upload any newly-added extras (ones with base64), keep already-uploaded ones (.url)
+    let extraUrls = [];
+    if (stagedExtras.length) {
+      showToast(`Uploading ${stagedExtras.length} additional image${stagedExtras.length === 1 ? '' : 's'}…`);
+      for (const s of stagedExtras) {
+        if (s.url) { extraUrls.push(s.url); continue; }
+        const p = await apiUploadImage(s.base64, s.ext);
+        extraUrls.push(p);
+      }
+    }
+
     if (editingId) {
       const bag = bags.find(b => b.id === editingId);
       if (!bag) return;
@@ -264,6 +339,10 @@ async function saveItem() {
       bag.price = price;
       bag.branch = branch || undefined;
       bag.stock = { ...bag.stock, ...stock };
+      // On edit, additional images = whatever is currently in stagedExtras (which we pre-populated from the bag)
+      bag.images = extraUrls.length ? [imagePath || bag.image, ...extraUrls] : (imagePath ? [imagePath] : (bag.images || []));
+      // Strip the lead since image field stays as the primary
+      if (bag.images.length) bag.images = bag.images.filter((u, i, a) => u && a.indexOf(u) === i);
       // Remove sizes set to 0 if they are explicitly cleared in the form
       document.querySelectorAll('.stock-qty').forEach(inp => {
         const sz = inp.dataset.size;
@@ -278,6 +357,7 @@ async function saveItem() {
       if (!stagedImage) { showToast('Add an item image.'); setSaving(false); return; }
       const id = 'item_' + Date.now();
       const newBag = { id, name, category, description: desc, price, stock, sales: [], image: imagePath, createdAt: new Date().toISOString() };
+      if (extraUrls.length) newBag.images = [imagePath, ...extraUrls];
       if (stagedInstagramUrl) newBag.instagramUrl = stagedInstagramUrl;
       if (branch) newBag.branch = branch;
       bags.unshift(newBag);
@@ -288,6 +368,8 @@ async function saveItem() {
     renderList();
     renderDashboard();
     renderInventory();
+    renderSets();
+    renderSetPicker();
   } catch (err) {
     showToast('Error: ' + err.message);
     console.error(err);
@@ -309,6 +391,8 @@ function resetForm() {
   imageInput.value = '';
   imagePreview.innerHTML = '';
   stagedImage = null;
+  stagedExtras = [];
+  renderExtraImagesPreview();
   stagedInstagramUrl = '';
   const igInput = document.getElementById('igQuickInput');
   if (igInput) igInput.value = '';
@@ -332,6 +416,9 @@ function editItem(id) {
   setStockToForm(bag.stock || {});
   stagedImage = null;
   imagePreview.innerHTML = `<img src="${bag.image}" style="max-width:180px;border-radius:8px;">`;
+  // Pre-populate stagedExtras from the bag's images[] (skip the lead image which is the main)
+  stagedExtras = ((bag.images && bag.images.length > 1) ? bag.images.slice(1) : []).map(url => ({ url }));
+  renderExtraImagesPreview();
   document.getElementById('formTitle').textContent = 'Edit item';
   document.getElementById('cancelBtn').style.display = 'inline-block';
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -781,6 +868,173 @@ async function bulkSetCategory() {
   }
 }
 
+// ====== STYLE SETS ======
+let sets = [];        // local state, loaded from API
+let editingSetId = null;
+let setDraftItemIds = [];
+
+async function publishWithSets() {
+  // Reuse apiPublish but include sets
+  const res = await fetch(`${API_BASE}/api/bulk`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ADMIN_TOKEN}` },
+    body: JSON.stringify({ bags, settings, sets }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Save failed: ${res.status}`);
+  }
+}
+
+function renderSetSelected() {
+  const wrap = document.getElementById('setSelectedItems');
+  if (!wrap) return;
+  if (!setDraftItemIds.length) {
+    wrap.innerHTML = '<p style="color:var(--ink-faint);font-size:13px;margin:6px 0;">No items selected yet.</p>';
+    return;
+  }
+  wrap.innerHTML = setDraftItemIds.map(id => {
+    const b = bags.find(x => x.id === id);
+    if (!b) return '';
+    return `
+      <div class="set-chip">
+        <img src="${b.image}" alt="">
+        <span>${escapeHtml(b.name)}</span>
+        <button data-set-remove="${escapeHtml(id)}" aria-label="Remove">×</button>
+      </div>`;
+  }).join('');
+  wrap.querySelectorAll('[data-set-remove]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      setDraftItemIds = setDraftItemIds.filter(id => id !== btn.dataset.setRemove);
+      renderSetSelected();
+      renderSetPicker();
+    });
+  });
+}
+
+function renderSetPicker() {
+  const picker = document.getElementById('setItemPicker');
+  if (!picker) return;
+  const q = (document.getElementById('setItemSearch')?.value || '').toLowerCase().trim();
+  const matches = bags
+    .filter(b => !setDraftItemIds.includes(b.id))
+    .filter(b => !q || `${b.name} ${b.category || ''}`.toLowerCase().includes(q))
+    .slice(0, 60);
+  picker.innerHTML = matches.length
+    ? matches.map(b => `
+        <button class="set-pick" data-set-add="${escapeHtml(b.id)}" type="button">
+          <img src="${b.image}" alt="">
+          <div class="set-pick-body">
+            <div class="set-pick-name">${escapeHtml(b.name)}</div>
+            <div class="set-pick-meta">${escapeHtml(b.category || '')}${b.price > 0 ? ' · ' + fmtKsh(b.price) : ''}</div>
+          </div>
+        </button>`).join('')
+    : '<p style="color:var(--ink-faint);font-size:13px;padding:8px 0;">No items match.</p>';
+  picker.querySelectorAll('[data-set-add]').forEach(b => {
+    b.addEventListener('click', () => {
+      setDraftItemIds.push(b.dataset.setAdd);
+      renderSetSelected();
+      renderSetPicker();
+    });
+  });
+}
+
+document.getElementById('setItemSearch')?.addEventListener('input', renderSetPicker);
+
+document.getElementById('setSaveBtn')?.addEventListener('click', async () => {
+  const name = document.getElementById('setNameInput').value.trim();
+  const desc = document.getElementById('setDescInput').value.trim();
+  if (!name) { showToast('Set name is required.'); return; }
+  if (!setDraftItemIds.length) { showToast('Add at least one item.'); return; }
+
+  if (editingSetId) {
+    const s = sets.find(s => s.id === editingSetId);
+    if (s) { s.name = name; s.description = desc; s.itemIds = [...setDraftItemIds]; }
+  } else {
+    sets.unshift({
+      id: 'set_' + Date.now(),
+      name, description: desc,
+      itemIds: [...setDraftItemIds],
+      createdAt: new Date().toISOString(),
+    });
+  }
+  try {
+    await publishWithSets();
+    resetSetForm();
+    renderSets();
+    showToast(editingSetId ? 'Set updated.' : 'Set created.');
+  } catch (err) {
+    showToast('Error: ' + err.message);
+  }
+});
+
+document.getElementById('setCancelBtn')?.addEventListener('click', () => { resetSetForm(); });
+
+function resetSetForm() {
+  editingSetId = null;
+  setDraftItemIds = [];
+  document.getElementById('editingSetId').value = '';
+  document.getElementById('setNameInput').value = '';
+  document.getElementById('setDescInput').value = '';
+  document.getElementById('setItemSearch').value = '';
+  document.getElementById('setFormTitle').textContent = 'Create a new set';
+  document.getElementById('setCancelBtn').style.display = 'none';
+  renderSetSelected();
+  renderSetPicker();
+}
+
+function editSet(id) {
+  const s = sets.find(x => x.id === id);
+  if (!s) return;
+  editingSetId = id;
+  document.getElementById('editingSetId').value = id;
+  document.getElementById('setNameInput').value = s.name;
+  document.getElementById('setDescInput').value = s.description || '';
+  setDraftItemIds = [...(s.itemIds || [])];
+  document.getElementById('setFormTitle').textContent = 'Edit set';
+  document.getElementById('setCancelBtn').style.display = 'inline-block';
+  renderSetSelected();
+  renderSetPicker();
+  document.getElementById('setsDash').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function deleteSet(id) {
+  if (!confirm('Delete this set? (Items inside the set stay in the catalog — only the grouping is removed.)')) return;
+  sets = sets.filter(s => s.id !== id);
+  try {
+    await publishWithSets();
+    renderSets();
+    showToast('Set deleted.');
+  } catch (err) { showToast('Error: ' + err.message); }
+}
+
+function renderSets() {
+  document.getElementById('setCount').textContent = sets.length;
+  const nav = document.getElementById('navSetCount');
+  if (nav) nav.textContent = sets.length || '';
+  const list = document.getElementById('setList');
+  if (!list) return;
+  list.innerHTML = sets.length
+    ? sets.map(s => {
+        const itemList = s.itemIds.map(id => bags.find(b => b.id === id)).filter(Boolean);
+        const thumbs = itemList.slice(0, 4).map(b => `<img src="${b.image}" alt="${escapeHtml(b.name)}">`).join('');
+        return `
+          <div class="set-card">
+            <div class="set-card-thumbs">${thumbs}</div>
+            <div class="set-card-body">
+              <div class="set-card-name">${escapeHtml(s.name)}</div>
+              ${s.description ? `<div class="set-card-desc">${escapeHtml(s.description)}</div>` : ''}
+              <div class="set-card-meta">${itemList.length} item${itemList.length === 1 ? '' : 's'} · ${itemList.map(b => escapeHtml(b.name)).slice(0, 3).join(' · ')}${itemList.length > 3 ? ' …' : ''}</div>
+              <div class="admin-card-actions">
+                <button onclick="editSet('${s.id}')">Edit</button>
+                <button class="danger" onclick="deleteSet('${s.id}')">Delete</button>
+              </div>
+            </div>
+          </div>`;
+      }).join('')
+    : '<p style="color:var(--ink-faint);padding:16px 0;">No sets yet. Build your first one above.</p>';
+}
+
 // ====== INIT ======
 window.editItem = editItem;
 window.deleteItem = deleteItem;
@@ -790,6 +1044,8 @@ window.bulkClear = bulkClear;
 window.bulkSelectAll = bulkSelectAll;
 window.bulkDelete = bulkDelete;
 window.bulkSetCategory = bulkSetCategory;
+window.editSet = editSet;
+window.deleteSet = deleteSet;
 
 async function init() {
   showToast('Loading…');
@@ -797,6 +1053,9 @@ async function init() {
   renderList();
   renderDashboard();
   renderInventory();
+  renderSets();
+  renderSetSelected();
+  renderSetPicker();
 }
 
 checkAuth();

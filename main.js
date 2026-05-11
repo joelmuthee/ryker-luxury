@@ -41,19 +41,28 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     return m ? parseInt(m[1], 10) : 0;
   }
 
+  function itemImages(item) {
+    if (item.images && item.images.length) return item.images;
+    return item.image ? [item.image] : [];
+  }
+
+  let sets = [];
+
   async function loadData() {
     try {
       const res = await fetch(`${API_BASE}/api/bags?_=${Date.now()}`);
       const json = await res.json();
       items = json.bags || [];
       settings = json.settings || {};
+      sets = json.sets || [];
     } catch (e) {
       try {
         const res = await fetch('data.json');
         const json = await res.json();
         items = json.bags || [];
         settings = json.settings || {};
-      } catch (e2) { items = []; }
+        sets = json.sets || [];
+      } catch (e2) { items = []; sets = []; }
     }
   }
 
@@ -245,10 +254,18 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
       const totalUnits = totalStock(item);
       const lowStock = !soldOut && totalUnits >= 1 && totalUnits <= LOW_STOCK && item.stock && Object.keys(item.stock).length > 0;
       const saved = wishlist.has(item.id);
+      const imgs = itemImages(item);
+      const hasMany = imgs.length > 1;
+      const carouselInner = imgs.map((src, idx) => `<img class="card-img" src="${src}?${IMG_VERSION}" alt="${escapeHtml(item.name)} ${idx + 1}" loading="${idx === 0 ? 'eager' : 'lazy'}" data-slide="${idx}">`).join('');
+      const dots = hasMany ? `<div class="carousel-dots">${imgs.map((_, i) => `<span class="carousel-dot${i === 0 ? ' active' : ''}" data-dot="${i}"></span>`).join('')}</div>` : '';
+      const arrows = hasMany ? `<button class="carousel-arrow prev" data-carousel="prev" aria-label="Previous">‹</button><button class="carousel-arrow next" data-carousel="next" aria-label="Next">›</button>` : '';
+
       return `
       <article class="card ${soldOut ? 'sold' : ''}">
-        <div class="card-img-wrap" data-action="zoom" data-id="${escapeHtml(item.id)}">
-          <img class="card-img" src="${item.image}?${IMG_VERSION}" alt="${escapeHtml(item.name)}" loading="lazy">
+        <div class="card-img-wrap${hasMany ? ' has-carousel' : ''}" data-action="zoom" data-id="${escapeHtml(item.id)}">
+          <div class="card-carousel" data-current="0" data-count="${imgs.length}">${carouselInner}</div>
+          ${dots}
+          ${arrows}
           ${soldOut ? '<span class="badge-sold">Sold out</span>' : ''}
           ${!soldOut && isNewItem ? '<span class="badge-new">NEW</span>' : ''}
           ${lowStock ? `<span class="badge-low">Only ${totalUnits} left</span>` : ''}
@@ -363,6 +380,33 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
   const lightboxCap = document.getElementById('lightboxCaption');
   const lightboxClose = document.getElementById('lightboxClose');
 
+  // Carousel state for the lightbox
+  let lightboxImages = [];
+  let lightboxIndex = 0;
+  function updateLightbox() {
+    if (!lightboxImages.length) return;
+    lightboxImg.src = lightboxImages[lightboxIndex] + '?' + IMG_VERSION;
+    const cap = lightboxCap.dataset.baseCaption || '';
+    lightboxCap.textContent = cap + (lightboxImages.length > 1 ? `  (${lightboxIndex + 1} / ${lightboxImages.length})` : '');
+  }
+  function shiftLightbox(delta) {
+    if (lightboxImages.length < 2) return;
+    lightboxIndex = (lightboxIndex + delta + lightboxImages.length) % lightboxImages.length;
+    updateLightbox();
+  }
+
+  function shiftCardCarousel(wrap, delta) {
+    const carousel = wrap.querySelector('.card-carousel');
+    if (!carousel) return;
+    const count = parseInt(carousel.dataset.count, 10) || 1;
+    if (count < 2) return;
+    let cur = parseInt(carousel.dataset.current, 10) || 0;
+    cur = (cur + delta + count) % count;
+    carousel.dataset.current = cur;
+    carousel.style.transform = `translateX(-${cur * 100}%)`;
+    wrap.querySelectorAll('.carousel-dot').forEach((d, i) => d.classList.toggle('active', i === cur));
+  }
+
   gallery.addEventListener('click', e => {
     // Wishlist toggle
     const heart = e.target.closest('[data-wishlist]');
@@ -380,17 +424,59 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
       openSizeGuide();
       return;
     }
+    // Carousel arrows
+    const arrow = e.target.closest('[data-carousel]');
+    if (arrow) {
+      e.preventDefault(); e.stopPropagation();
+      const wrap = arrow.closest('.card-img-wrap');
+      shiftCardCarousel(wrap, arrow.dataset.carousel === 'next' ? 1 : -1);
+      return;
+    }
+    // Carousel dots
+    const dot = e.target.closest('[data-dot]');
+    if (dot) {
+      e.preventDefault(); e.stopPropagation();
+      const wrap = dot.closest('.card-img-wrap');
+      const carousel = wrap.querySelector('.card-carousel');
+      const target = parseInt(dot.dataset.dot, 10);
+      const cur = parseInt(carousel.dataset.current, 10) || 0;
+      shiftCardCarousel(wrap, target - cur);
+      return;
+    }
     // Lightbox zoom
     const wrap = e.target.closest('[data-action="zoom"]');
     if (!wrap) return;
     const id = wrap.dataset.id;
     const item = items.find(i => i.id === id);
     if (!item) return;
-    lightboxImg.src = item.image + '?' + IMG_VERSION;
+    lightboxImages = itemImages(item);
+    // Start at the slide the card is currently showing
+    const carousel = wrap.querySelector('.card-carousel');
+    lightboxIndex = carousel ? parseInt(carousel.dataset.current, 10) || 0 : 0;
+    lightboxCap.dataset.baseCaption = `${item.name}${item.price > 0 ? ' · ' + fmtPrice(item.price) : ''}${isSoldOut(item) ? ' · SOLD OUT' : ''}`;
     lightboxImg.alt = item.name;
-    lightboxCap.textContent = `${item.name}${item.price > 0 ? ' · ' + fmtPrice(item.price) : ''}${isSoldOut(item) ? ' · SOLD OUT' : ''}`;
+    updateLightbox();
     lightbox.classList.add('open');
     lightbox.setAttribute('aria-hidden', 'false');
+  });
+
+  // Touch swipe on cards (basic)
+  let touchStartX = null, touchStartY = null, touchWrap = null;
+  gallery.addEventListener('touchstart', e => {
+    const wrap = e.target.closest('.card-img-wrap.has-carousel');
+    if (!wrap) return;
+    touchWrap = wrap;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+  gallery.addEventListener('touchend', e => {
+    if (!touchWrap || touchStartX == null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+      shiftCardCarousel(touchWrap, dx < 0 ? 1 : -1);
+    }
+    touchWrap = null; touchStartX = null; touchStartY = null;
   });
 
   // Wishlist drawer + Size guide modal
@@ -452,10 +538,23 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     if (e.key !== 'Escape') return;
     closeWishlist();
     closeSizeGuide();
+    document.getElementById('setModal')?.classList.remove('open');
+    if (!document.getElementById('wishlistModal').classList.contains('open') && !document.getElementById('sizeGuideModal').classList.contains('open') && !document.getElementById('setModal').classList.contains('open')) {
+      document.body.style.overflow = '';
+    }
   });
   function closeLightbox() { lightbox.classList.remove('open'); lightbox.setAttribute('aria-hidden', 'true'); }
   lightboxClose.addEventListener('click', closeLightbox);
-  lightbox.addEventListener('click', e => { if (e.target === lightbox) closeLightbox(); });
+  lightbox.addEventListener('click', e => {
+    const arrow = e.target.closest('[data-lightbox-arrow]');
+    if (arrow) { e.stopPropagation(); shiftLightbox(arrow.dataset.lightboxArrow === 'next' ? 1 : -1); return; }
+    if (e.target === lightbox) closeLightbox();
+  });
+  document.addEventListener('keydown', e => {
+    if (!lightbox.classList.contains('open')) return;
+    if (e.key === 'ArrowRight') shiftLightbox(1);
+    else if (e.key === 'ArrowLeft') shiftLightbox(-1);
+  });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
 
   // Mobile nav — toggle classes on both elements so hamburger animates to X
@@ -473,9 +572,65 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     document.body.style.overflow = '';
   }));
 
+  // ====== SHOP THE LOOK ======
+  function renderShopTheLook() {
+    const wrap = document.getElementById('shopTheLook');
+    const row = document.getElementById('stlRow');
+    if (!wrap || !row) return;
+    if (!sets.length) { wrap.style.display = 'none'; return; }
+    wrap.style.display = '';
+    row.innerHTML = sets.map(s => {
+      const itemList = s.itemIds.map(id => items.find(i => i.id === id)).filter(Boolean);
+      const thumbs = itemList.slice(0, 3).map(i => `<img src="${(itemImages(i)[0] || '')}?${IMG_VERSION}" alt="${escapeHtml(i.name)}">`).join('');
+      return `
+        <article class="stl-card" data-set-id="${escapeHtml(s.id)}">
+          <div class="stl-thumbs">${thumbs}${itemList.length > 3 ? `<div class="stl-thumb-more">+${itemList.length - 3}</div>` : ''}</div>
+          <div class="stl-body">
+            <div class="stl-name">${escapeHtml(s.name)}</div>
+            ${s.description ? `<div class="stl-desc">${escapeHtml(s.description)}</div>` : ''}
+            <div class="stl-meta">${itemList.length} piece${itemList.length === 1 ? '' : 's'}</div>
+          </div>
+        </article>`;
+    }).join('');
+    row.querySelectorAll('[data-set-id]').forEach(card => {
+      card.addEventListener('click', () => openSetModal(card.dataset.setId));
+    });
+  }
+
+  function openSetModal(setId) {
+    const s = sets.find(x => x.id === setId);
+    if (!s) return;
+    const itemList = s.itemIds.map(id => items.find(i => i.id === id)).filter(Boolean);
+    document.getElementById('setModalTitle').textContent = s.name;
+    document.getElementById('setModalDesc').textContent = s.description || '';
+    document.getElementById('setModalDesc').style.display = s.description ? '' : 'none';
+    document.getElementById('setModalItems').innerHTML = itemList.map(i => `
+      <div class="set-modal-item">
+        <img src="${(itemImages(i)[0] || '')}?${IMG_VERSION}" alt="${escapeHtml(i.name)}">
+        <div class="set-modal-item-body">
+          <div class="set-modal-item-name">${escapeHtml(i.name)}</div>
+          <div class="set-modal-item-meta">${i.price > 0 ? fmtPrice(i.price) : 'Price on request'}${i.category ? ' · ' + escapeHtml(i.category) : ''}</div>
+        </div>
+      </div>
+    `).join('');
+    const phone = settings.whatsappNumber || '254714672436';
+    const lines = itemList.map((i, idx) => `${idx + 1}. *${i.name}*${i.price > 0 ? ' (' + fmtPrice(i.price) + ')' : ''}`);
+    const msg = `Hi Ryker! I'd like to enquire about the *${s.name}* look:\n\n${lines.join('\n')}\n\nAre all of these available?`;
+    document.getElementById('setModalEnquire').href = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+    document.getElementById('setModal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSetModal() {
+    document.getElementById('setModal').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  document.getElementById('setModalClose')?.addEventListener('click', closeSetModal);
+  document.getElementById('setModal')?.addEventListener('click', e => { if (e.target.id === 'setModal') closeSetModal(); });
+
   document.getElementById('year').textContent = new Date().getFullYear();
   saveWishlist();
 
   await loadData();
+  renderShopTheLook();
   render();
 })();
