@@ -8,12 +8,37 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
   const catPills = document.getElementById('catPills');
   const sizePills = document.getElementById('sizePills');
   const PAGE_SIZE = 15;
+  const NEW_DAYS = 7;
+  const LOW_STOCK = 3;
+  const WISHLIST_KEY = 'ryker_wishlist';
   let items = [];
   let settings = {};
   let currentAvail = 'all';
   let currentCat = 'all';
   let currentSize = 'all';
+  let currentSort = 'default';
+  let currentSearch = '';
   let currentPage = 1;
+  let wishlist = new Set(JSON.parse(localStorage.getItem(WISHLIST_KEY) || '[]'));
+
+  function saveWishlist() {
+    localStorage.setItem(WISHLIST_KEY, JSON.stringify([...wishlist]));
+    const btn = document.getElementById('wishlistBtn');
+    if (btn) btn.querySelector('.wl-count').textContent = wishlist.size || '';
+    btn?.classList.toggle('has-items', wishlist.size > 0);
+  }
+
+  function isNew(item) {
+    if (!item.createdAt) return false;
+    const days = (Date.now() - new Date(item.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+    return days < NEW_DAYS;
+  }
+
+  function itemTimestamp(item) {
+    if (item.createdAt) return new Date(item.createdAt).getTime();
+    const m = item.id?.match(/_(\d{10,})/);
+    return m ? parseInt(m[1], 10) : 0;
+  }
 
   async function loadData() {
     try {
@@ -155,12 +180,26 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     buildCatPills();
     buildSizePills();
 
-    const filtered = items.filter(item => {
+    // Search match — case-insensitive, fuzzy across name + description + category
+    const q = currentSearch.trim().toLowerCase();
+    function searchMatch(item) {
+      if (!q) return true;
+      const hay = `${item.name} ${item.description || ''} ${item.category || ''}`.toLowerCase();
+      return q.split(/\s+/).every(tok => hay.includes(tok));
+    }
+
+    let filtered = items.filter(item => {
       const soldOut = isSoldOut(item);
       const availOk = currentAvail === 'all' || (currentAvail === 'sold' ? soldOut : !soldOut);
       const catOk = currentCat === 'all' || item.category === currentCat;
-      return availOk && catOk && sizeMatch(item);
+      return availOk && catOk && sizeMatch(item) && searchMatch(item);
     });
+
+    // Sort
+    if (currentSort === 'newest')      filtered.sort((a, b) => itemTimestamp(b) - itemTimestamp(a));
+    else if (currentSort === 'priceAsc')  filtered.sort((a, b) => (a.price || 0) - (b.price || 0));
+    else if (currentSort === 'priceDesc') filtered.sort((a, b) => (b.price || 0) - (a.price || 0));
+    // 'default' keeps IG feed order (the natural array order)
 
     const availCount = items.filter(i => !isSoldOut(i)).length;
     const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -178,12 +217,21 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
         ? `<div class="size-chips">${avail.map(s => `<span class="size-chip">${escapeHtml(s)}</span>`).join('')}</div>`
         : '';
       const catBadge = item.category ? `<span class="badge-cat">${escapeHtml(item.category)}</span>` : '';
+      const isNewItem = isNew(item);
+      const totalUnits = totalStock(item);
+      const lowStock = !soldOut && totalUnits >= 1 && totalUnits <= LOW_STOCK && item.stock && Object.keys(item.stock).length > 0;
+      const saved = wishlist.has(item.id);
       return `
       <article class="card ${soldOut ? 'sold' : ''}">
         <div class="card-img-wrap" data-action="zoom" data-id="${escapeHtml(item.id)}">
           <img class="card-img" src="${item.image}?${IMG_VERSION}" alt="${escapeHtml(item.name)}" loading="lazy">
           ${soldOut ? '<span class="badge-sold">Sold out</span>' : ''}
+          ${!soldOut && isNewItem ? '<span class="badge-new">NEW</span>' : ''}
+          ${lowStock ? `<span class="badge-low">Only ${totalUnits} left</span>` : ''}
           ${catBadge}
+          <button class="heart-btn ${saved ? 'saved' : ''}" data-wishlist="${escapeHtml(item.id)}" aria-label="${saved ? 'Remove from saved' : 'Save item'}" title="${saved ? 'Saved' : 'Save for later'}">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="${saved ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          </button>
         </div>
         <div class="card-body">
           <h3 class="card-title">${escapeHtml(item.name)}</h3>
@@ -191,6 +239,7 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
           ${sizesHtml}
           <div class="card-price-row">
             <span class="card-price">${item.price > 0 ? fmtPrice(item.price) : '<small style="font-style:italic;font-size:14px;">Price on request</small>'}</span>
+            ${avail.length ? '<a class="size-guide-link" data-action="size-guide">Size guide</a>' : ''}
           </div>
           <div class="card-actions">
             <a class="btn-card primary${soldOut ? ' soldout' : ''}" href="${whatsappLink(item, soldOut)}" target="_blank" rel="noopener">
@@ -262,6 +311,28 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     });
   });
 
+  // Search input — debounced
+  const searchInput = document.getElementById('searchInput');
+  let searchTimer;
+  searchInput?.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      currentSearch = searchInput.value;
+      currentPage = 1;
+      render();
+    }, 180);
+  });
+  document.getElementById('searchClear')?.addEventListener('click', () => {
+    searchInput.value = ''; currentSearch = ''; currentPage = 1; render(); searchInput.focus();
+  });
+
+  // Sort dropdown
+  document.getElementById('sortSelect')?.addEventListener('change', e => {
+    currentSort = e.target.value;
+    currentPage = 1;
+    render();
+  });
+
   // Lightbox
   const lightbox = document.getElementById('lightbox');
   const lightboxImg = document.getElementById('lightboxImg');
@@ -269,6 +340,23 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
   const lightboxClose = document.getElementById('lightboxClose');
 
   gallery.addEventListener('click', e => {
+    // Wishlist toggle
+    const heart = e.target.closest('[data-wishlist]');
+    if (heart) {
+      e.preventDefault(); e.stopPropagation();
+      const id = heart.dataset.wishlist;
+      if (wishlist.has(id)) wishlist.delete(id); else wishlist.add(id);
+      saveWishlist();
+      render();
+      return;
+    }
+    // Size guide
+    if (e.target.closest('[data-action="size-guide"]')) {
+      e.preventDefault();
+      openSizeGuide();
+      return;
+    }
+    // Lightbox zoom
     const wrap = e.target.closest('[data-action="zoom"]');
     if (!wrap) return;
     const id = wrap.dataset.id;
@@ -276,9 +364,70 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     if (!item) return;
     lightboxImg.src = item.image + '?' + IMG_VERSION;
     lightboxImg.alt = item.name;
-    lightboxCap.textContent = `${item.name} · ${fmtPrice(item.price)}${isSoldOut(item) ? ' · SOLD OUT' : ''}`;
+    lightboxCap.textContent = `${item.name}${item.price > 0 ? ' · ' + fmtPrice(item.price) : ''}${isSoldOut(item) ? ' · SOLD OUT' : ''}`;
     lightbox.classList.add('open');
     lightbox.setAttribute('aria-hidden', 'false');
+  });
+
+  // Wishlist drawer + Size guide modal
+  function openWishlist() {
+    const items_saved = items.filter(i => wishlist.has(i.id));
+    const modal = document.getElementById('wishlistModal');
+    const body = document.getElementById('wishlistBody');
+    if (!items_saved.length) {
+      body.innerHTML = '<p style="text-align:center;color:var(--ink-faint);padding:24px 0;">No saved items yet. Tap the heart on any item to save it for later.</p>';
+    } else {
+      body.innerHTML = items_saved.map(i => `
+        <div class="wl-row">
+          <img src="${i.image}?${IMG_VERSION}" alt="${escapeHtml(i.name)}">
+          <div class="wl-row-body">
+            <div class="wl-row-name">${escapeHtml(i.name)}</div>
+            <div class="wl-row-meta">${i.price > 0 ? fmtPrice(i.price) : 'Price on request'}${i.category ? ' · ' + escapeHtml(i.category) : ''}</div>
+          </div>
+          <button class="wl-remove" data-remove="${escapeHtml(i.id)}" aria-label="Remove">×</button>
+        </div>
+      `).join('');
+    }
+    document.getElementById('wishlistEnquireAll').style.display = items_saved.length ? 'inline-flex' : 'none';
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeWishlist() {
+    document.getElementById('wishlistModal').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  document.getElementById('wishlistBtn')?.addEventListener('click', e => { e.preventDefault(); openWishlist(); });
+  document.getElementById('wishlistClose')?.addEventListener('click', closeWishlist);
+  document.getElementById('wishlistModal')?.addEventListener('click', e => {
+    if (e.target.id === 'wishlistModal') return closeWishlist();
+    const rm = e.target.closest('[data-remove]');
+    if (rm) { wishlist.delete(rm.dataset.remove); saveWishlist(); openWishlist(); render(); }
+  });
+  document.getElementById('wishlistEnquireAll')?.addEventListener('click', e => {
+    e.preventDefault();
+    const items_saved = items.filter(i => wishlist.has(i.id));
+    if (!items_saved.length) return;
+    const phone = settings.whatsappNumber || '254714672436';
+    const lines = items_saved.map((i, idx) => `${idx + 1}. *${i.name}*${i.price > 0 ? ' (' + fmtPrice(i.price) + ')' : ''}`);
+    const msg = `Hi Ryker! I'd like to enquire about these saved items:\n\n${lines.join('\n')}\n\nAre they available?`;
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+  });
+
+  function openSizeGuide() {
+    document.getElementById('sizeGuideModal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSizeGuide() {
+    document.getElementById('sizeGuideModal').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  document.getElementById('sizeGuideClose')?.addEventListener('click', closeSizeGuide);
+  document.getElementById('sizeGuideModal')?.addEventListener('click', e => { if (e.target.id === 'sizeGuideModal') closeSizeGuide(); });
+
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    closeWishlist();
+    closeSizeGuide();
   });
   function closeLightbox() { lightbox.classList.remove('open'); lightbox.setAttribute('aria-hidden', 'true'); }
   lightboxClose.addEventListener('click', closeLightbox);
@@ -301,6 +450,7 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
   }));
 
   document.getElementById('year').textContent = new Date().getFullYear();
+  saveWishlist();
 
   await loadData();
   render();

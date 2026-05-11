@@ -222,7 +222,7 @@ async function saveItem() {
     } else {
       if (!stagedImage) { showToast('Add an item image.'); setSaving(false); return; }
       const id = 'item_' + Date.now();
-      bags.unshift({ id, name, category, description: desc, price, stock, sales: [], image: imagePath });
+      bags.unshift({ id, name, category, description: desc, price, stock, sales: [], image: imagePath, createdAt: new Date().toISOString() });
       await apiPublish();
       showToast('Item added and live!');
     }
