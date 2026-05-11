@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#3d2817">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=13">
+<link rel="stylesheet" href="styles.css?v=14">
 <script src="https://www.google.com/recaptcha/enterprise.js?render=6LeDBFwpAAAAAJe8ux9-imrqZ2ueRsEtdiWoDDpX" async defer></script>
 </head>
 <body style="background:#f8f6f2;">
@@ -42,7 +42,6 @@
     <a href="#addForm" class="admin-nav-cta">+ Add new item</a>
     <a href="#salesDash">Sales</a>
     <a href="#invDash">Inventory</a>
-    <a href="#setsDash">Style sets <span class="admin-nav-count" id="navSetCount"></span></a>
     <a href="#broadcastDash">Broadcast</a>
     <a href="#analyticsDash">Analytics</a>
     <a href="#allItems">All items <span class="admin-nav-count" id="navItemCount"></span></a>
@@ -88,40 +87,6 @@
       </table>
     </div>
     <button class="btn-admin" id="invShowMore" style="display:none;width:100%;margin-top:14px;"></button>
-  </section>
-
-  <!-- ====== STYLE SETS ====== -->
-  <section class="dash" id="setsDash">
-    <h2 class="dash-title">Style sets · Shop the look</h2>
-    <p style="font-size:13.5px;color:var(--ink-soft);margin:-8px 0 16px;">Group items into a complete look (e.g. "Weekend Casual" — polo + jeans + sneakers). Customers see them at the top of the catalog and can enquire about the whole look in one WhatsApp message.</p>
-
-    <div class="set-form">
-      <h3 style="font-family:var(--serif);font-size:20px;margin:0 0 12px;" id="setFormTitle">Create a new set</h3>
-      <input type="hidden" id="editingSetId">
-      <div class="field-row">
-        <div class="field">
-          <label>Set name</label>
-          <input id="setNameInput" type="text" placeholder="e.g. Weekend Casual">
-        </div>
-        <div class="field">
-          <label>Short description <small style="font-weight:400;color:#999;">(optional)</small></label>
-          <input id="setDescInput" type="text" placeholder="e.g. Easy fit for the weekend">
-        </div>
-      </div>
-      <div class="field">
-        <label>Items in this set <small style="font-weight:400;color:#999;">— click items below to add or remove</small></label>
-        <div id="setSelectedItems" class="set-selected-items"></div>
-        <input id="setItemSearch" type="text" placeholder="Search items by name…" style="margin-top:8px;">
-        <div id="setItemPicker" class="set-item-picker"></div>
-      </div>
-      <div class="admin-actions">
-        <button class="btn-admin primary" id="setSaveBtn">Save set</button>
-        <button class="btn-admin" id="setCancelBtn" style="display:none;">Cancel edit</button>
-      </div>
-    </div>
-
-    <div class="section-divider">Existing sets <span id="setCount">0</span></div>
-    <div class="set-list" id="setList"></div>
   </section>
 
   <!-- ====== WHATSAPP BROADCAST ====== -->
@@ -400,6 +365,6 @@
   </div>
 </div>
 
-<script src="admin.js?v=6"></script>
+<script src="admin.js?v=7"></script>
 </body>
 </html>

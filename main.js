@@ -59,23 +59,19 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     return item.image ? [item.image] : [];
   }
 
-  let sets = [];
-
   async function loadData() {
     try {
       const res = await fetch(`${API_BASE}/api/bags?_=${Date.now()}`);
       const json = await res.json();
       items = json.bags || [];
       settings = json.settings || {};
-      sets = json.sets || [];
     } catch (e) {
       try {
         const res = await fetch('data.json');
         const json = await res.json();
         items = json.bags || [];
         settings = json.settings || {};
-        sets = json.sets || [];
-      } catch (e2) { items = []; sets = []; }
+      } catch (e2) { items = []; }
     }
   }
 
@@ -566,8 +562,7 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     if (e.key !== 'Escape') return;
     closeWishlist();
     closeSizeGuide();
-    document.getElementById('setModal')?.classList.remove('open');
-    if (!document.getElementById('wishlistModal').classList.contains('open') && !document.getElementById('sizeGuideModal').classList.contains('open') && !document.getElementById('setModal').classList.contains('open')) {
+    if (!document.getElementById('wishlistModal').classList.contains('open') && !document.getElementById('sizeGuideModal').classList.contains('open')) {
       document.body.style.overflow = '';
     }
   });
@@ -600,65 +595,9 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     document.body.style.overflow = '';
   }));
 
-  // ====== SHOP THE LOOK ======
-  function renderShopTheLook() {
-    const wrap = document.getElementById('shopTheLook');
-    const row = document.getElementById('stlRow');
-    if (!wrap || !row) return;
-    if (!sets.length) { wrap.style.display = 'none'; return; }
-    wrap.style.display = '';
-    row.innerHTML = sets.map(s => {
-      const itemList = s.itemIds.map(id => items.find(i => i.id === id)).filter(Boolean);
-      const thumbs = itemList.slice(0, 3).map(i => `<img src="${(itemImages(i)[0] || '')}?${IMG_VERSION}" alt="${escapeHtml(i.name)}">`).join('');
-      return `
-        <article class="stl-card" data-set-id="${escapeHtml(s.id)}">
-          <div class="stl-thumbs">${thumbs}${itemList.length > 3 ? `<div class="stl-thumb-more">+${itemList.length - 3}</div>` : ''}</div>
-          <div class="stl-body">
-            <div class="stl-name">${escapeHtml(s.name)}</div>
-            ${s.description ? `<div class="stl-desc">${escapeHtml(s.description)}</div>` : ''}
-            <div class="stl-meta">${itemList.length} piece${itemList.length === 1 ? '' : 's'}</div>
-          </div>
-        </article>`;
-    }).join('');
-    row.querySelectorAll('[data-set-id]').forEach(card => {
-      card.addEventListener('click', () => openSetModal(card.dataset.setId));
-    });
-  }
-
-  function openSetModal(setId) {
-    const s = sets.find(x => x.id === setId);
-    if (!s) return;
-    const itemList = s.itemIds.map(id => items.find(i => i.id === id)).filter(Boolean);
-    document.getElementById('setModalTitle').textContent = s.name;
-    document.getElementById('setModalDesc').textContent = s.description || '';
-    document.getElementById('setModalDesc').style.display = s.description ? '' : 'none';
-    document.getElementById('setModalItems').innerHTML = itemList.map(i => `
-      <div class="set-modal-item">
-        <img src="${(itemImages(i)[0] || '')}?${IMG_VERSION}" alt="${escapeHtml(i.name)}">
-        <div class="set-modal-item-body">
-          <div class="set-modal-item-name">${escapeHtml(i.name)}</div>
-          <div class="set-modal-item-meta">${i.price > 0 ? fmtPrice(i.price) : 'Price on request'}${i.category ? ' · ' + escapeHtml(i.category) : ''}</div>
-        </div>
-      </div>
-    `).join('');
-    const phone = settings.whatsappNumber || '254714672436';
-    const lines = itemList.map((i, idx) => `${idx + 1}. *${i.name}*${i.price > 0 ? ' (' + fmtPrice(i.price) + ')' : ''}`);
-    const msg = `Hi Ryker! I'd like to enquire about the *${s.name}* look:\n\n${lines.join('\n')}\n\nAre all of these available?`;
-    document.getElementById('setModalEnquire').href = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
-    document.getElementById('setModal').classList.add('open');
-    document.body.style.overflow = 'hidden';
-  }
-  function closeSetModal() {
-    document.getElementById('setModal').classList.remove('open');
-    document.body.style.overflow = '';
-  }
-  document.getElementById('setModalClose')?.addEventListener('click', closeSetModal);
-  document.getElementById('setModal')?.addEventListener('click', e => { if (e.target.id === 'setModal') closeSetModal(); });
-
   document.getElementById('year').textContent = new Date().getFullYear();
   saveWishlist();
 
   await loadData();
-  renderShopTheLook();
   render();
 })();

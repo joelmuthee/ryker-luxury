@@ -56,7 +56,7 @@ async function apiPublish() {
   const res = await fetch(`${API_BASE}/api/bulk`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ADMIN_TOKEN}` },
-    body: JSON.stringify({ bags, settings, sets }),
+    body: JSON.stringify({ bags, settings }),
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Save failed: ${res.status}`); }
 }
@@ -66,7 +66,6 @@ async function loadData() {
   const json = await res.json();
   bags = json.bags || [];
   settings = json.settings || {};
-  sets = json.sets || [];
 }
 
 // ====== HELPERS ======
@@ -368,8 +367,6 @@ async function saveItem() {
     renderList();
     renderDashboard();
     renderInventory();
-    renderSets();
-    renderSetPicker();
   } catch (err) {
     showToast('Error: ' + err.message);
     console.error(err);
@@ -868,172 +865,6 @@ async function bulkSetCategory() {
   }
 }
 
-// ====== STYLE SETS ======
-let sets = [];        // local state, loaded from API
-let editingSetId = null;
-let setDraftItemIds = [];
-
-async function publishWithSets() {
-  // Reuse apiPublish but include sets
-  const res = await fetch(`${API_BASE}/api/bulk`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ADMIN_TOKEN}` },
-    body: JSON.stringify({ bags, settings, sets }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Save failed: ${res.status}`);
-  }
-}
-
-function renderSetSelected() {
-  const wrap = document.getElementById('setSelectedItems');
-  if (!wrap) return;
-  if (!setDraftItemIds.length) {
-    wrap.innerHTML = '<p style="color:var(--ink-faint);font-size:13px;margin:6px 0;">No items selected yet.</p>';
-    return;
-  }
-  wrap.innerHTML = setDraftItemIds.map(id => {
-    const b = bags.find(x => x.id === id);
-    if (!b) return '';
-    return `
-      <div class="set-chip">
-        <img src="${b.image}" alt="">
-        <span>${escapeHtml(b.name)}</span>
-        <button data-set-remove="${escapeHtml(id)}" aria-label="Remove">×</button>
-      </div>`;
-  }).join('');
-  wrap.querySelectorAll('[data-set-remove]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      setDraftItemIds = setDraftItemIds.filter(id => id !== btn.dataset.setRemove);
-      renderSetSelected();
-      renderSetPicker();
-    });
-  });
-}
-
-function renderSetPicker() {
-  const picker = document.getElementById('setItemPicker');
-  if (!picker) return;
-  const q = (document.getElementById('setItemSearch')?.value || '').toLowerCase().trim();
-  const matches = bags
-    .filter(b => !setDraftItemIds.includes(b.id))
-    .filter(b => !q || `${b.name} ${b.category || ''}`.toLowerCase().includes(q))
-    .slice(0, 60);
-  picker.innerHTML = matches.length
-    ? matches.map(b => `
-        <button class="set-pick" data-set-add="${escapeHtml(b.id)}" type="button">
-          <img src="${b.image}" alt="">
-          <div class="set-pick-body">
-            <div class="set-pick-name">${escapeHtml(b.name)}</div>
-            <div class="set-pick-meta">${escapeHtml(b.category || '')}${b.price > 0 ? ' · ' + fmtKsh(b.price) : ''}</div>
-          </div>
-        </button>`).join('')
-    : '<p style="color:var(--ink-faint);font-size:13px;padding:8px 0;">No items match.</p>';
-  picker.querySelectorAll('[data-set-add]').forEach(b => {
-    b.addEventListener('click', () => {
-      setDraftItemIds.push(b.dataset.setAdd);
-      renderSetSelected();
-      renderSetPicker();
-    });
-  });
-}
-
-document.getElementById('setItemSearch')?.addEventListener('input', renderSetPicker);
-
-document.getElementById('setSaveBtn')?.addEventListener('click', async () => {
-  const name = document.getElementById('setNameInput').value.trim();
-  const desc = document.getElementById('setDescInput').value.trim();
-  if (!name) { showToast('Set name is required.'); return; }
-  if (!setDraftItemIds.length) { showToast('Add at least one item.'); return; }
-
-  if (editingSetId) {
-    const s = sets.find(s => s.id === editingSetId);
-    if (s) { s.name = name; s.description = desc; s.itemIds = [...setDraftItemIds]; }
-  } else {
-    sets.unshift({
-      id: 'set_' + Date.now(),
-      name, description: desc,
-      itemIds: [...setDraftItemIds],
-      createdAt: new Date().toISOString(),
-    });
-  }
-  try {
-    await publishWithSets();
-    resetSetForm();
-    renderSets();
-    showToast(editingSetId ? 'Set updated.' : 'Set created.');
-  } catch (err) {
-    showToast('Error: ' + err.message);
-  }
-});
-
-document.getElementById('setCancelBtn')?.addEventListener('click', () => { resetSetForm(); });
-
-function resetSetForm() {
-  editingSetId = null;
-  setDraftItemIds = [];
-  document.getElementById('editingSetId').value = '';
-  document.getElementById('setNameInput').value = '';
-  document.getElementById('setDescInput').value = '';
-  document.getElementById('setItemSearch').value = '';
-  document.getElementById('setFormTitle').textContent = 'Create a new set';
-  document.getElementById('setCancelBtn').style.display = 'none';
-  renderSetSelected();
-  renderSetPicker();
-}
-
-function editSet(id) {
-  const s = sets.find(x => x.id === id);
-  if (!s) return;
-  editingSetId = id;
-  document.getElementById('editingSetId').value = id;
-  document.getElementById('setNameInput').value = s.name;
-  document.getElementById('setDescInput').value = s.description || '';
-  setDraftItemIds = [...(s.itemIds || [])];
-  document.getElementById('setFormTitle').textContent = 'Edit set';
-  document.getElementById('setCancelBtn').style.display = 'inline-block';
-  renderSetSelected();
-  renderSetPicker();
-  document.getElementById('setsDash').scrollIntoView({ behavior: 'smooth' });
-}
-
-async function deleteSet(id) {
-  if (!confirm('Delete this set? (Items inside the set stay in the catalog — only the grouping is removed.)')) return;
-  sets = sets.filter(s => s.id !== id);
-  try {
-    await publishWithSets();
-    renderSets();
-    showToast('Set deleted.');
-  } catch (err) { showToast('Error: ' + err.message); }
-}
-
-function renderSets() {
-  document.getElementById('setCount').textContent = sets.length;
-  const nav = document.getElementById('navSetCount');
-  if (nav) nav.textContent = sets.length || '';
-  const list = document.getElementById('setList');
-  if (!list) return;
-  list.innerHTML = sets.length
-    ? sets.map(s => {
-        const itemList = s.itemIds.map(id => bags.find(b => b.id === id)).filter(Boolean);
-        const thumbs = itemList.slice(0, 4).map(b => `<img src="${b.image}" alt="${escapeHtml(b.name)}">`).join('');
-        return `
-          <div class="set-card">
-            <div class="set-card-thumbs">${thumbs}</div>
-            <div class="set-card-body">
-              <div class="set-card-name">${escapeHtml(s.name)}</div>
-              ${s.description ? `<div class="set-card-desc">${escapeHtml(s.description)}</div>` : ''}
-              <div class="set-card-meta">${itemList.length} item${itemList.length === 1 ? '' : 's'} · ${itemList.map(b => escapeHtml(b.name)).slice(0, 3).join(' · ')}${itemList.length > 3 ? ' …' : ''}</div>
-              <div class="admin-card-actions">
-                <button onclick="editSet('${s.id}')">Edit</button>
-                <button class="danger" onclick="deleteSet('${s.id}')">Delete</button>
-              </div>
-            </div>
-          </div>`;
-      }).join('')
-    : '<p style="color:var(--ink-faint);padding:16px 0;">No sets yet. Build your first one above.</p>';
-}
 
 // ====== INIT ======
 window.editItem = editItem;
@@ -1044,8 +875,6 @@ window.bulkClear = bulkClear;
 window.bulkSelectAll = bulkSelectAll;
 window.bulkDelete = bulkDelete;
 window.bulkSetCategory = bulkSetCategory;
-window.editSet = editSet;
-window.deleteSet = deleteSet;
 
 // ====== WHATSAPP BROADCAST ======
 let broadcastSelectedIds = [];
@@ -1274,9 +1103,6 @@ async function init() {
   renderList();
   renderDashboard();
   renderInventory();
-  renderSets();
-  renderSetSelected();
-  renderSetPicker();
   renderBroadcastSelected();
   renderBroadcastPicker();
   renderBroadcastRecipients();
