@@ -310,6 +310,23 @@ img { max-width: 100%; display: block; }
 .set-card-meta { font-size: 11.5px; color: var(--ink-faint); margin-bottom: 8px; }
 .set-card .admin-card-actions button { flex: 1; padding: 6px 8px; font-size: 12px; border-radius: 6px; border: 1px solid var(--line); background: #fff; cursor: pointer; font-family: inherit; }
 
+/* Broadcast recipients */
+.broadcast-recipients { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; max-height: 280px; overflow-y: auto; padding: 4px; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
+.broadcast-recipient {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 2px 8px;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px;
+  cursor: pointer; font-family: inherit; transition: 0.15s; background: #fff;
+}
+.broadcast-recipient.on { background: var(--surface); border-color: var(--gold); }
+.broadcast-recipient input { grid-row: 1 / 3; width: 16px; height: 16px; cursor: pointer; accent-color: var(--gold-deep); }
+.broadcast-recipient-name { grid-column: 2; font-size: 13px; font-weight: 600; color: var(--ink); }
+.broadcast-recipient-phone { grid-column: 3; font-size: 11px; color: var(--ink-faint); font-family: monospace; align-self: start; }
+.broadcast-recipient-meta { grid-column: 2 / -1; font-size: 11px; color: var(--ink-faint); }
+@media (max-width: 600px) { .broadcast-recipients { grid-template-columns: 1fr; } }
+
 /* Modal open state */
 .modal { display: none; }
 .modal.open { display: flex; }

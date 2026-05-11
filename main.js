@@ -22,6 +22,19 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
   let currentPage = 1;
   let wishlist = new Set(JSON.parse(localStorage.getItem(WISHLIST_KEY) || '[]'));
 
+  // ====== ANALYTICS ======
+  // Per-browser localStorage tracking. Aggregate metrics surface in admin /analytics section.
+  const ANALYTICS_KEY = 'ryker_analytics';
+  function track(metric, itemId) {
+    try {
+      const data = JSON.parse(localStorage.getItem(ANALYTICS_KEY) || '{}');
+      data[metric] = data[metric] || {};
+      data[metric][itemId] = (data[metric][itemId] || 0) + 1;
+      data._lastUpdated = new Date().toISOString();
+      localStorage.setItem(ANALYTICS_KEY, JSON.stringify(data));
+    } catch (_) {}
+  }
+
   function saveWishlist() {
     localStorage.setItem(WISHLIST_KEY, JSON.stringify([...wishlist]));
     const btn = document.getElementById('wishlistBtn');
@@ -413,10 +426,24 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     if (heart) {
       e.preventDefault(); e.stopPropagation();
       const id = heart.dataset.wishlist;
-      if (wishlist.has(id)) wishlist.delete(id); else wishlist.add(id);
+      if (wishlist.has(id)) wishlist.delete(id);
+      else { wishlist.add(id); track('itemWishlist', id); }
       saveWishlist();
       render();
       return;
+    }
+    // Track enquire (WA) and IG clicks
+    const enquire = e.target.closest('.btn-card.primary');
+    if (enquire) {
+      const card = enquire.closest('.card');
+      const wrap = card?.querySelector('[data-id]');
+      if (wrap) track('itemEnquiries', wrap.dataset.id);
+    }
+    const igClick = e.target.closest('.btn-card.ig');
+    if (igClick) {
+      const card = igClick.closest('.card');
+      const wrap = card?.querySelector('[data-id]');
+      if (wrap) track('itemIgClicks', wrap.dataset.id);
     }
     // Size guide
     if (e.target.closest('[data-action="size-guide"]')) {
@@ -449,6 +476,7 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     const id = wrap.dataset.id;
     const item = items.find(i => i.id === id);
     if (!item) return;
+    track('itemViews', id);
     lightboxImages = itemImages(item);
     // Start at the slide the card is currently showing
     const carousel = wrap.querySelector('.card-carousel');

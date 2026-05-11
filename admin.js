@@ -1047,6 +1047,227 @@ window.bulkSetCategory = bulkSetCategory;
 window.editSet = editSet;
 window.deleteSet = deleteSet;
 
+// ====== WHATSAPP BROADCAST ======
+let broadcastSelectedIds = [];
+let broadcastRecipientsState = {};  // phone -> { name, included }
+
+function pastBuyers() {
+  // Pull unique past buyers from sales history across all items
+  const map = new Map();
+  for (const bag of bags) {
+    for (const s of (bag.sales || [])) {
+      if (!s.buyerPhone) continue;
+      const phone = String(s.buyerPhone).replace(/[^0-9]/g, '');
+      if (phone.length < 9) continue;
+      const existing = map.get(phone);
+      const soldAt = new Date(s.soldAt || 0).getTime();
+      if (!existing || soldAt > existing.soldAt) {
+        map.set(phone, { phone, name: s.buyerName || '', soldAt, lastBought: bag.name });
+      }
+    }
+  }
+  return [...map.values()].sort((a, b) => b.soldAt - a.soldAt);
+}
+
+function renderBroadcastSelected() {
+  const wrap = document.getElementById('broadcastSelectedItems');
+  if (!wrap) return;
+  if (!broadcastSelectedIds.length) { wrap.innerHTML = '<p style="color:var(--ink-faint);font-size:13px;margin:6px 0;">No items selected — message will be text-only.</p>'; return; }
+  wrap.innerHTML = broadcastSelectedIds.map(id => {
+    const b = bags.find(x => x.id === id);
+    if (!b) return '';
+    return `<div class="set-chip"><img src="${b.image}" alt=""><span>${escapeHtml(b.name)}</span><button data-bc-remove="${escapeHtml(id)}" aria-label="Remove">×</button></div>`;
+  }).join('');
+  wrap.querySelectorAll('[data-bc-remove]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      broadcastSelectedIds = broadcastSelectedIds.filter(id => id !== btn.dataset.bcRemove);
+      renderBroadcastSelected();
+      renderBroadcastPicker();
+      renderBroadcastPreview();
+    });
+  });
+}
+
+function renderBroadcastPicker() {
+  const picker = document.getElementById('broadcastItemPicker');
+  if (!picker) return;
+  const q = (document.getElementById('broadcastItemSearch')?.value || '').toLowerCase().trim();
+  const matches = bags
+    .filter(b => !broadcastSelectedIds.includes(b.id))
+    .filter(b => !q || `${b.name} ${b.category || ''}`.toLowerCase().includes(q))
+    .slice(0, 40);
+  picker.innerHTML = matches.length
+    ? matches.map(b => `
+        <button class="set-pick" data-bc-add="${escapeHtml(b.id)}" type="button">
+          <img src="${b.image}" alt="">
+          <div class="set-pick-body">
+            <div class="set-pick-name">${escapeHtml(b.name)}</div>
+            <div class="set-pick-meta">${escapeHtml(b.category || '')}${b.price > 0 ? ' · ' + fmtKsh(b.price) : ''}</div>
+          </div>
+        </button>`).join('')
+    : '<p style="color:var(--ink-faint);font-size:13px;padding:8px 0;">No matches.</p>';
+  picker.querySelectorAll('[data-bc-add]').forEach(b => {
+    b.addEventListener('click', () => {
+      broadcastSelectedIds.push(b.dataset.bcAdd);
+      renderBroadcastSelected();
+      renderBroadcastPicker();
+      renderBroadcastPreview();
+    });
+  });
+}
+
+function renderBroadcastRecipients() {
+  const wrap = document.getElementById('broadcastRecipients');
+  if (!wrap) return;
+  const buyers = pastBuyers();
+  // Initialize state for new buyers
+  for (const b of buyers) {
+    if (!(b.phone in broadcastRecipientsState)) {
+      broadcastRecipientsState[b.phone] = { name: b.name, included: true };
+    }
+  }
+  if (!buyers.length) {
+    wrap.innerHTML = '<p style="color:var(--ink-faint);font-size:13px;padding:8px 0;">No past buyers yet — once you record sales with buyer phones, they\'ll show up here.</p>';
+    return;
+  }
+  wrap.innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:8px;">
+      <button class="btn-admin" type="button" data-bc-recip="all" style="padding:4px 10px;font-size:11px;">Select all</button>
+      <button class="btn-admin" type="button" data-bc-recip="none" style="padding:4px 10px;font-size:11px;">Deselect all</button>
+      <span style="font-size:12px;color:var(--ink-faint);margin-left:auto;align-self:center;" id="broadcastSelectedCount"></span>
+    </div>
+    ${buyers.map(b => {
+      const st = broadcastRecipientsState[b.phone];
+      return `
+        <label class="broadcast-recipient${st.included ? ' on' : ''}">
+          <input type="checkbox" data-bc-toggle="${b.phone}" ${st.included ? 'checked' : ''}>
+          <span class="broadcast-recipient-name">${escapeHtml(b.name || 'Unknown buyer')}</span>
+          <span class="broadcast-recipient-phone">+${b.phone}</span>
+          <span class="broadcast-recipient-meta">last: ${escapeHtml(b.lastBought)}</span>
+        </label>`;
+    }).join('')}
+  `;
+  wrap.querySelectorAll('[data-bc-toggle]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      broadcastRecipientsState[cb.dataset.bcToggle].included = cb.checked;
+      cb.closest('.broadcast-recipient').classList.toggle('on', cb.checked);
+      updateBroadcastCount();
+    });
+  });
+  wrap.querySelectorAll('[data-bc-recip]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const on = btn.dataset.bcRecip === 'all';
+      buyers.forEach(b => { broadcastRecipientsState[b.phone].included = on; });
+      renderBroadcastRecipients();
+    });
+  });
+  updateBroadcastCount();
+}
+
+function updateBroadcastCount() {
+  const el = document.getElementById('broadcastSelectedCount');
+  if (!el) return;
+  const n = Object.values(broadcastRecipientsState).filter(s => s.included).length;
+  el.textContent = `${n} selected`;
+}
+
+function buildBroadcastMessage(recipientName) {
+  const subject = (document.getElementById('broadcastSubject')?.value || '').trim();
+  const items = broadcastSelectedIds.map(id => bags.find(b => b.id === id)).filter(Boolean);
+  const itemsBlock = items.length
+    ? '\n\n' + items.map((b, i) => `${i + 1}. *${b.name}*${b.price > 0 ? ' — ' + fmtKsh(b.price) : ''}`).join('\n')
+    : '';
+  const lookUrl = 'https://rykerluxury.essenceautomations.com';
+  const greet = recipientName ? `Habari ${recipientName.split(' ')[0]}! ` : 'Habari! ';
+  return `${greet}It's Ryker Luxury — ${subject || 'fresh stock just landed'}.${itemsBlock}\n\nTap to browse: ${lookUrl}\n\nReply here to enquire. 🤍`;
+}
+
+function renderBroadcastPreview() {
+  const preview = document.getElementById('broadcastPreview');
+  if (!preview) return;
+  preview.value = buildBroadcastMessage('{First name}');
+}
+
+document.getElementById('broadcastSubject')?.addEventListener('input', renderBroadcastPreview);
+document.getElementById('broadcastItemSearch')?.addEventListener('input', renderBroadcastPicker);
+
+document.getElementById('broadcastCopyBtn')?.addEventListener('click', () => {
+  navigator.clipboard.writeText(buildBroadcastMessage(''));
+  showToast('Message copied — paste it into your WhatsApp broadcast.');
+});
+
+document.getElementById('broadcastStartBtn')?.addEventListener('click', () => {
+  const recipients = pastBuyers().filter(b => broadcastRecipientsState[b.phone]?.included);
+  if (!recipients.length) { showToast('Pick at least one recipient.'); return; }
+  if (!confirm(`Open ${recipients.length} WhatsApp window${recipients.length === 1 ? '' : 's'}, one per buyer. Send each one manually. OK?`)) return;
+  let i = 0;
+  function next() {
+    if (i >= recipients.length) {
+      document.getElementById('broadcastStatus').textContent = `✓ Opened ${recipients.length} WhatsApp window${recipients.length === 1 ? '' : 's'}.`;
+      return;
+    }
+    const r = recipients[i++];
+    const msg = buildBroadcastMessage(r.name);
+    window.open(`https://wa.me/${r.phone}?text=${encodeURIComponent(msg)}`, '_blank');
+    document.getElementById('broadcastStatus').textContent = `Opening ${i} of ${recipients.length}…`;
+    // Throttle so browser doesn't block popups
+    setTimeout(next, 700);
+  }
+  next();
+});
+
+// ====== ANALYTICS ======
+const ANALYTICS_KEY = 'ryker_analytics';
+function loadAnalytics() {
+  try { return JSON.parse(localStorage.getItem(ANALYTICS_KEY) || '{}'); }
+  catch { return {}; }
+}
+function renderAnalytics() {
+  const stats = loadAnalytics();
+  const grid = document.getElementById('analyticsKpiGrid');
+  if (!grid) return;
+
+  const totalViews = Object.values(stats.itemViews || {}).reduce((a, b) => a + b, 0);
+  const totalEnquiries = Object.values(stats.itemEnquiries || {}).reduce((a, b) => a + b, 0);
+  const totalWishlist = Object.values(stats.itemWishlist || {}).reduce((a, b) => a + b, 0);
+  const totalIgClicks = Object.values(stats.itemIgClicks || {}).reduce((a, b) => a + b, 0);
+
+  grid.innerHTML = [
+    { label: 'Item views', val: totalViews.toLocaleString(), sub: 'lightbox opens', cls: '' },
+    { label: 'Enquiries', val: totalEnquiries.toLocaleString(), sub: 'WhatsApp clicks', cls: 'success' },
+    { label: 'Saved by buyers', val: totalWishlist.toLocaleString(), sub: 'wishlist hearts', cls: '' },
+    { label: 'IG clicks', val: totalIgClicks.toLocaleString(), sub: 'View on IG taps', cls: '' },
+  ].map(k => `
+    <div class="inv-kpi ${k.cls}">
+      <div class="inv-kpi-label">${k.label}</div>
+      <div class="inv-kpi-val">${k.val}</div>
+      <div class="inv-kpi-sub">${k.sub}</div>
+    </div>`).join('');
+
+  function topN(map = {}, n = 6) {
+    return Object.entries(map)
+      .map(([id, count]) => ({ id, count, bag: bags.find(b => b.id === id) }))
+      .filter(x => x.bag)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, n);
+  }
+
+  function renderTopList(list, emptyMsg) {
+    if (!list.length) return `<p style="color:#999;font-size:13px;">${emptyMsg}</p>`;
+    return list.map(x => `
+      <div class="recent-row">
+        <img src="${x.bag.image}" alt="${escapeHtml(x.bag.name)}">
+        <div class="recent-body">
+          <div class="recent-name">${escapeHtml(x.bag.name)}</div>
+          <div class="recent-meta">${x.count} ${x.count === 1 ? 'time' : 'times'} · ${escapeHtml(x.bag.category || '')}</div>
+        </div>
+      </div>`).join('');
+  }
+
+  document.getElementById('analyticsTopViews').innerHTML = renderTopList(topN(stats.itemViews), 'No views yet.');
+  document.getElementById('analyticsTopEnquiries').innerHTML = renderTopList(topN(stats.itemEnquiries), 'No enquiries yet.');
+}
+
 async function init() {
   showToast('Loading…');
   await loadData();
@@ -1056,6 +1277,11 @@ async function init() {
   renderSets();
   renderSetSelected();
   renderSetPicker();
+  renderBroadcastSelected();
+  renderBroadcastPicker();
+  renderBroadcastRecipients();
+  renderBroadcastPreview();
+  renderAnalytics();
 }
 
 checkAuth();
