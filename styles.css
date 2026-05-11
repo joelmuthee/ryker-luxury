@@ -212,6 +212,78 @@ img { max-width: 100%; display: block; }
 .btn-admin.gold { background: var(--gold); color: var(--ink); border-color: var(--gold); font-weight: 700; }
 .btn-admin.gold:hover { background: var(--gold-deep); color: #fff; border-color: var(--gold-deep); }
 
+/* Sticky admin sub-nav */
+.admin-nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--bg);
+  margin: 0 -24px 24px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  scrollbar-width: thin;
+}
+.admin-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+  background: #fff;
+  transition: 0.15s;
+  white-space: nowrap;
+}
+.admin-nav a:hover {
+  background: var(--ink);
+  color: var(--gold-light);
+  border-color: var(--ink);
+}
+.admin-nav a.admin-nav-cta {
+  background: var(--gold);
+  color: var(--choco-deep);
+  border-color: var(--gold);
+  font-weight: 700;
+}
+.admin-nav a.admin-nav-cta:hover {
+  background: var(--gold-deep);
+  color: #fff;
+  border-color: var(--gold-deep);
+}
+.admin-nav-count {
+  display: inline-block;
+  background: var(--line);
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 99px;
+  margin-left: 2px;
+}
+.admin-nav a:hover .admin-nav-count { background: rgba(255,255,255,0.15); color: var(--gold-light); }
+
+/* Smooth scroll + offset so sticky nav doesn't hide section headers */
+html { scroll-behavior: smooth; }
+#addForm, #salesDash, #invDash, #allItems { scroll-margin-top: 80px; }
+
+@media (max-width: 600px) {
+  .admin-nav {
+    margin: 0 -16px 20px;
+    padding: 10px 16px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  .admin-nav a { padding: 7px 12px; font-size: 13px; flex-shrink: 0; }
+}
+
 /* Sales dashboard */
 .dash { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 24px; margin-bottom: 24px; }
 .dash-title { font-family: var(--serif); font-size: 26px; font-weight: 500; margin: 0 0 18px; color: var(--ink); }

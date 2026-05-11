@@ -576,6 +576,8 @@ function renderInventory() {
 function renderList() {
   const list = document.getElementById('adminList');
   document.getElementById('bagCount').textContent = bags.length;
+  const navCount = document.getElementById('navItemCount');
+  if (navCount) navCount.textContent = bags.length;
   list.innerHTML = bags.map(bag => {
     const units = totalStock(bag);
     const sold = totalUnitsSold(bag);

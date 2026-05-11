@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#3d2817">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=7">
+<link rel="stylesheet" href="styles.css?v=8">
 <script src="https://www.google.com/recaptcha/enterprise.js?render=6LeDBFwpAAAAAJe8ux9-imrqZ2ueRsEtdiWoDDpX" async defer></script>
 </head>
 <body style="background:#f8f6f2;">
@@ -36,6 +36,14 @@
       <button class="btn-admin danger" id="logoutBtn">Logout</button>
     </div>
   </div>
+
+  <!-- ====== QUICK NAV ====== -->
+  <nav class="admin-nav" id="adminNav">
+    <a href="#addForm" class="admin-nav-cta">+ Add new item</a>
+    <a href="#salesDash">Sales</a>
+    <a href="#invDash">Inventory</a>
+    <a href="#allItems">All items <span class="admin-nav-count" id="navItemCount"></span></a>
+  </nav>
 
   <!-- ====== SALES DASHBOARD ====== -->
   <section class="dash" id="salesDash">
@@ -78,7 +86,7 @@
   </section>
 
   <!-- ====== ADD / EDIT ITEM ====== -->
-  <div class="admin-form">
+  <div class="admin-form" id="addForm">
     <h2 id="formTitle">Add a new item</h2>
     <input type="hidden" id="editingId">
 
@@ -191,7 +199,7 @@
   </div>
 
   <!-- ====== ITEM LIST ====== -->
-  <div class="section-divider">All items <span id="bagCount">0</span></div>
+  <div class="section-divider" id="allItems">All items <span id="bagCount">0</span></div>
   <div class="admin-list" id="adminList"></div>
 
 </div><!-- /dashboard -->
@@ -259,6 +267,6 @@
   </div>
 </div>
 
-<script src="admin.js?v=1"></script>
+<script src="admin.js?v=2"></script>
 </body>
 </html>
