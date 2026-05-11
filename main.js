@@ -44,7 +44,8 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     const sizes = !hasSales
       ? Object.keys(item.stock)
       : Object.entries(item.stock).filter(([, q]) => q > 0).map(([s]) => s);
-    return sizes.sort(sortSize);
+    // "One Size" is a stock placeholder for sizeless items — hide from chips/filter
+    return sizes.filter(s => s !== 'One Size').sort(sortSize);
   }
 
   function isSoldOut(item) {

@@ -152,7 +152,17 @@
 
     <!-- STOCK ENTRY -->
     <div class="field">
-      <label>Stock per size <small style="font-weight:400;color:#999;">(enter 0 or leave blank = no stock for that size)</small></label>
+      <label>Stock <small style="font-weight:400;color:#999;">— enter quantity per size, or use "One size" if it doesn't come in sizes (caps, watches, fragrances etc.)</small></label>
+
+      <div class="stock-entry-group">
+        <label class="group-label">One size / no sizing</label>
+        <div class="stock-entry-row">
+          <div class="stock-entry-item" style="align-items:flex-start;">
+            <span class="size-lbl">Qty</span>
+            <input type="number" min="0" step="1" data-size="One Size" class="stock-qty" style="width:120px;" placeholder="e.g. 10">
+          </div>
+        </div>
+      </div>
 
       <div class="stock-entry-group">
         <label class="group-label">Standard</label>
