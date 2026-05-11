@@ -536,24 +536,60 @@ html { scroll-behavior: smooth; }
 .restock-btn { padding: 4px 10px; font-size: 11px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; background: #fff; font-family: inherit; transition: 0.15s; }
 .restock-btn:hover { background: var(--ink); color: #fff; border-color: var(--ink); }
 
-/* IG quick-add panel */
+/* IG quick-add panel — the fastest path; make it visually lead the form */
 .ig-quick-add {
-  background: linear-gradient(135deg, #fff8ec, #f5e9d3);
-  border: 1px solid var(--gold-light);
-  border-radius: 10px;
-  padding: 14px 16px;
-  margin-bottom: 20px;
+  background: linear-gradient(135deg, #fff5e0 0%, #f5e2bb 100%);
+  border: 2px solid var(--gold);
+  border-left: 6px solid var(--gold-deep);
+  border-radius: 12px;
+  padding: 20px 22px;
+  margin-bottom: 18px;
+  box-shadow: 0 4px 14px rgba(184,149,106,0.18);
+  position: relative;
 }
-.ig-quick-row { display: flex; gap: 8px; margin-top: 6px; }
+.ig-quick-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.ig-quick-badge {
+  display: inline-block;
+  background: var(--choco-deep); color: var(--gold);
+  font-size: 10px; font-weight: 800; letter-spacing: 0.16em;
+  padding: 4px 10px; border-radius: 999px;
+}
+.ig-quick-title {
+  font-family: var(--serif); font-size: 22px; font-weight: 600;
+  color: var(--ink); margin: 0;
+}
+.ig-quick-desc {
+  font-size: 13.5px; color: var(--ink-soft); margin: 0 0 12px;
+  line-height: 1.5;
+}
+.ig-quick-row { display: flex; gap: 8px; }
 .ig-quick-row input {
-  flex: 1; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px;
+  flex: 1; padding: 12px 16px; border: 1px solid var(--gold-deep); border-radius: 8px;
   font-family: inherit; font-size: 14px; background: #fff; color: var(--ink);
 }
-.ig-quick-row input:focus { outline: none; border-color: var(--gold); }
-.ig-quick-row .btn-admin { flex-shrink: 0; }
-.ig-quick-status { font-size: 12.5px; margin: 8px 0 0; min-height: 18px; }
-.ig-quick-status.ok { color: #1a7a40; }
+.ig-quick-row input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(184,149,106,0.18); }
+.ig-quick-row .btn-admin { flex-shrink: 0; padding: 12px 20px; font-weight: 700; }
+.ig-quick-status { font-size: 12.5px; margin: 10px 0 0; min-height: 18px; }
+.ig-quick-status.ok { color: #1a7a40; font-weight: 600; }
 .ig-quick-status.err { color: #b00020; }
+
+/* "OR enter manually below" divider */
+.manual-entry-divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 6px 0 18px;
+  font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-faint); font-weight: 600;
+}
+.manual-entry-divider::before, .manual-entry-divider::after {
+  content: ""; flex: 1; height: 1px; background: var(--line);
+}
+
+@media (max-width: 600px) {
+  .ig-quick-add { padding: 16px; }
+  .ig-quick-title { font-size: 19px; }
+  .ig-quick-row { flex-direction: column; }
+  .ig-quick-row .btn-admin { padding: 11px 16px; }
+}
 
 /* Admin item form */
 .admin-form { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 24px; margin-bottom: 24px; }

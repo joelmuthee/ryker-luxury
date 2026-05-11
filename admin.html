@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#3d2817">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=15">
+<link rel="stylesheet" href="styles.css?v=16">
 <script src="https://www.google.com/recaptcha/enterprise.js?render=6LeDBFwpAAAAAJe8ux9-imrqZ2ueRsEtdiWoDDpX" async defer></script>
 </head>
 <body style="background:#f8f6f2;">
@@ -143,14 +143,22 @@
     <h2 id="formTitle">Add a new item</h2>
     <input type="hidden" id="editingId">
 
-    <!-- IG quick-add -->
-    <div class="field ig-quick-add">
-      <label>⚡ Quick-add from Instagram <small style="font-weight:400;color:#999;">— paste an IG post or reel URL to auto-fill the image and caption</small></label>
+    <!-- IG quick-add — fastest path -->
+    <div class="ig-quick-add">
+      <div class="ig-quick-head">
+        <span class="ig-quick-badge">⚡ FASTEST WAY</span>
+        <h3 class="ig-quick-title">Quick-add from Instagram</h3>
+      </div>
+      <p class="ig-quick-desc">Paste any IG post or reel URL — we'll auto-fill the image, description and IG link. You just review and set price + stock.</p>
       <div class="ig-quick-row">
         <input id="igQuickInput" type="url" placeholder="https://www.instagram.com/p/...">
-        <button class="btn-admin primary" id="igQuickBtn" type="button">Fetch</button>
+        <button class="btn-admin primary" id="igQuickBtn" type="button">Fetch from IG →</button>
       </div>
       <p id="igQuickStatus" class="ig-quick-status"></p>
+    </div>
+
+    <div class="manual-entry-divider">
+      <span>OR enter manually below</span>
     </div>
 
     <div class="field">
