@@ -511,6 +511,11 @@ function renderDashboard() {
 }
 
 // ====== INVENTORY ======
+// State for the inventory table view
+let invFilter = 'attention'; // 'attention' | 'all'
+let invShowAll = false;       // false = cap at INV_PAGE_SIZE
+const INV_PAGE_SIZE = 15;
+
 function renderInventory() {
   let totalItems = bags.length;
   let totalUnits = 0, totalValue = 0, lowStock = 0, outOfStock = 0;
@@ -536,8 +541,39 @@ function renderInventory() {
       <div class="inv-kpi-sub">${k.sub}</div>
     </div>`).join('');
 
-  // Sort by total stock ascending (so low-stock items appear first)
-  const sorted = [...bags].sort((a, b) => totalStock(a) - totalStock(b));
+  // Build the filter bar
+  const attentionBags = bags.filter(b => totalStock(b) <= 5);
+  const filterBar = document.getElementById('invFilterBar');
+  if (filterBar) {
+    filterBar.innerHTML = `
+      <button class="pill ${invFilter==='attention'?'active':''}" data-inv-filter="attention">
+        Needs attention <span class="admin-nav-count">${attentionBags.length}</span>
+      </button>
+      <button class="pill ${invFilter==='all'?'active':''}" data-inv-filter="all">
+        All items <span class="admin-nav-count">${bags.length}</span>
+      </button>
+    `;
+    filterBar.querySelectorAll('[data-inv-filter]').forEach(b => {
+      b.addEventListener('click', () => {
+        invFilter = b.dataset.invFilter;
+        invShowAll = false;
+        renderInventory();
+      });
+    });
+  }
+
+  // Apply filter, sort by lowest stock first
+  const filtered = (invFilter === 'attention' ? attentionBags : bags)
+    .slice()
+    .sort((a, b) => totalStock(a) - totalStock(b));
+
+  // Cap rendering unless showAll is set
+  const cap = invShowAll ? filtered.length : Math.min(INV_PAGE_SIZE, filtered.length);
+  const sorted = filtered.slice(0, cap);
+
+  // Update sort/count label
+  const lbl = document.getElementById('invSortLabel');
+  if (lbl) lbl.textContent = `showing ${sorted.length} of ${filtered.length} · sorted low → high`;
 
   document.getElementById('invTableBody').innerHTML = sorted.map(bag => {
     const units = totalStock(bag);
@@ -569,7 +605,21 @@ function renderInventory() {
         <button class="restock-btn" onclick="openRestockModal('${bag.id}')">+ Restock</button>
       </td>
     </tr>`;
-  }).join('');
+  }).join('') || `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--ink-faint);">${invFilter === 'attention' ? '🎉 Nothing needs attention — all items have healthy stock.' : 'No items yet.'}</td></tr>`;
+
+  // Show-more toggle
+  const toggle = document.getElementById('invShowMore');
+  if (toggle) {
+    if (filtered.length <= INV_PAGE_SIZE) {
+      toggle.style.display = 'none';
+    } else {
+      toggle.style.display = 'block';
+      toggle.textContent = invShowAll
+        ? `Show fewer (top ${INV_PAGE_SIZE})`
+        : `Show all ${filtered.length} items ↓`;
+      toggle.onclick = () => { invShowAll = !invShowAll; renderInventory(); };
+    }
+  }
 }
 
 // ====== ITEM LIST ======

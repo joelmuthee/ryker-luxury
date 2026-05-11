@@ -282,6 +282,14 @@ html { scroll-behavior: smooth; }
     -webkit-overflow-scrolling: touch;
   }
   .admin-nav a { padding: 7px 12px; font-size: 13px; flex-shrink: 0; }
+  /* Inventory table — compact on mobile + capped height with internal scroll if needed */
+  .inv-table { font-size: 12px; min-width: 640px; }
+  .inv-table th, .inv-table td { padding: 7px 8px; }
+  .inv-table .item-img { width: 32px; height: 32px; }
+  .inv-table-wrap { max-height: 520px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; }
+  .inv-filter-bar { margin: 6px 0 10px; }
+  #invDash .dash-title, #invDash .section-divider { font-size: 20px; }
+  #invDash .section-divider span { font-size: 11px; }
 }
 
 /* Sales dashboard */
@@ -322,8 +330,10 @@ html { scroll-behavior: smooth; }
 .inv-kpi-val { font-family: var(--serif); font-size: 30px; font-weight: 600; color: var(--ink); line-height: 1; }
 .inv-kpi-sub { font-size: 12px; color: var(--ink-faint); margin-top: 4px; }
 
-.inv-table-wrap { overflow-x: auto; }
-.inv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.inv-filter-bar { display: flex; gap: 8px; margin: 8px 0 14px; flex-wrap: wrap; }
+.inv-filter-bar .pill { font-weight: 600; }
+.inv-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.inv-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 720px; }
 .inv-table th { text-align: left; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); padding: 8px 12px; border-bottom: 2px solid var(--line); background: var(--surface); }
 .inv-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .inv-table tr:last-child td { border-bottom: none; }

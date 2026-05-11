@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#3d2817">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=8">
+<link rel="stylesheet" href="styles.css?v=9">
 <script src="https://www.google.com/recaptcha/enterprise.js?render=6LeDBFwpAAAAAJe8ux9-imrqZ2ueRsEtdiWoDDpX" async defer></script>
 </head>
 <body style="background:#f8f6f2;">
@@ -65,7 +65,8 @@
   <section class="dash" id="invDash">
     <h2 class="dash-title">Inventory Overview</h2>
     <div class="inv-kpi-grid" id="invKpiGrid"></div>
-    <div class="section-divider">Stock levels <span id="invSortLabel">sorted by stock (low → high)</span></div>
+    <div class="section-divider">Stock levels <span id="invSortLabel">sorted low → high</span></div>
+    <div class="inv-filter-bar filter-pills" id="invFilterBar"></div>
     <div class="inv-table-wrap">
       <table class="inv-table" id="invTable">
         <thead>
@@ -83,6 +84,7 @@
         <tbody id="invTableBody"></tbody>
       </table>
     </div>
+    <button class="btn-admin" id="invShowMore" style="display:none;width:100%;margin-top:14px;"></button>
   </section>
 
   <!-- ====== ADD / EDIT ITEM ====== -->
@@ -267,6 +269,6 @@
   </div>
 </div>
 
-<script src="admin.js?v=2"></script>
+<script src="admin.js?v=3"></script>
 </body>
 </html>
