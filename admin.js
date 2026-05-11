@@ -1007,7 +1007,7 @@ function buildBroadcastMessage(recipientName) {
     ? '\n\n' + items.map((b, i) => `${i + 1}. *${b.name}*${b.price > 0 ? ' — ' + fmtKsh(b.price) : ''}`).join('\n')
     : '';
   const lookUrl = 'https://rykerluxury.essenceautomations.com';
-  const greet = recipientName ? `Habari ${recipientName.split(' ')[0]}! ` : 'Habari! ';
+  const greet = recipientName ? `Hi ${recipientName.split(' ')[0]}! ` : 'Hi! ';
   return `${greet}It's Ryker Luxury — ${subject || 'fresh stock just landed'}.${itemsBlock}\n\nTap to browse: ${lookUrl}\n\nReply here to enquire. 🤍`;
 }
 
