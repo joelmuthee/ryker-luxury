@@ -9,7 +9,25 @@
       "Bash(CLOUDFLARE_ACCOUNT_ID=58685495706b973821d77208248c66fc npx wrangler kv namespace create \"rykerluxury-bags\")",
       "Bash(npm install *)",
       "Bash(CLOUDFLARE_ACCOUNT_ID=58685495706b973821d77208248c66fc npx wrangler deploy)",
-      "Bash(CLOUDFLARE_ACCOUNT_ID=58685495706b973821d77208248c66fc npx wrangler secret put ADMIN_TOKEN)"
+      "Bash(CLOUDFLARE_ACCOUNT_ID=58685495706b973821d77208248c66fc npx wrangler secret put ADMIN_TOKEN)",
+      "Bash(git rm *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'Remove node_modules from tracking *)",
+      "Bash(gh repo *)",
+      "PowerShell(where.exe git; where.exe git.exe 2>$null; $env:PATH -split ';' | Where-Object { Test-Path \"$_\\\\gh.exe\" } | Select-Object -First 3)",
+      "Bash(grep -iE \"\\(logo|\\\\.jpg|\\\\.png|\\\\.jpeg|\\\\.webp\\)$\")",
+      "mcp__playwright__browser_resize",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_evaluate",
+      "Bash(curl -s \"https://joelmuthee.github.io/ryker-luxury/styles.css?v=6\")",
+      "Bash(curl -s \"https://joelmuthee.github.io/ryker-luxury/?nocache=$\\(date +%s\\)\")",
+      "Bash(git checkout *)",
+      "Bash(rm -f mobile-*.png)",
+      "Bash(rm -rf .playwright-mcp/)",
+      "Bash(curl -s \"https://rykerluxury.essenceautomations.com/?nocache=$\\(date +%s\\)\")",
+      "Bash(curl -s \"https://api.github.com/repos/joelmuthee/ryker-luxury/pages/builds/latest\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/joelmuthee/ryker-luxury/master/index.html\")"
     ]
   }
 }
