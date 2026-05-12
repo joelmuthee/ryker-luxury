@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#3d2817">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20">
+<link rel="stylesheet" href="styles.css?v=21">
 <script src="https://www.google.com/recaptcha/enterprise.js?render=6LeDBFwpAAAAAJe8ux9-imrqZ2ueRsEtdiWoDDpX" async defer></script>
 </head>
 <body style="background:#f8f6f2;">
@@ -43,6 +43,7 @@
     <a href="#salesDash">Sales</a>
     <a href="#invDash">Inventory</a>
     <a href="#broadcastDash">WhatsApp Marketing</a>
+    <a href="#insightsDash">Insights</a>
     <a href="#allItems">All items <span class="admin-nav-count" id="navItemCount"></span></a>
   </nav>
 
@@ -118,6 +119,28 @@
       </div>
       <p id="broadcastStatus" style="font-size:13px;color:var(--ink-soft);margin-top:10px;"></p>
     </div>
+  </section>
+
+  <!-- ====== INSIGHTS (per-browser) ====== -->
+  <section class="dash" id="insightsDash">
+    <h2 class="dash-title">Insights <small style="font-family:var(--sans);font-size:11px;font-weight:500;letter-spacing:0.08em;color:var(--ink-faint);text-transform:uppercase;margin-left:6px;">This device only</small></h2>
+    <p style="font-size:13px;color:var(--ink-soft);margin:-8px 0 16px;">Counts visits, clicks and searches on this browser. Other devices have their own counters. For shop-wide visitor stats, ask me to plug in Cloudflare Web Analytics.</p>
+    <div class="inv-kpi-grid" id="insightsKpiGrid"></div>
+    <div class="dash-grid" style="margin-top:18px;">
+      <div class="dash-card">
+        <h3>Most viewed</h3>
+        <div id="insightsTopViews" class="recent-list"></div>
+      </div>
+      <div class="dash-card">
+        <h3>Most enquired about</h3>
+        <div id="insightsTopEnquiries" class="recent-list"></div>
+      </div>
+    </div>
+    <div class="dash-card" style="margin-top:14px;">
+      <h3>Searches with no results <small style="font-family:var(--sans);font-size:11px;font-weight:500;color:var(--ink-faint);margin-left:6px;">— stock to consider adding</small></h3>
+      <div id="insightsSearchGaps"></div>
+    </div>
+    <button class="btn-admin" id="insightsResetBtn" style="margin-top:14px;font-size:12px;">Reset insights on this device</button>
   </section>
 
   <!-- ====== ADD / EDIT ITEM ====== -->
@@ -355,6 +378,6 @@
   </div>
 </div>
 
-<script src="admin.js?v=10"></script>
+<script src="admin.js?v=11"></script>
 </body>
 </html>

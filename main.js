@@ -22,6 +22,19 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
   let currentPage = 1;
   let wishlist = new Set(JSON.parse(localStorage.getItem(WISHLIST_KEY) || '[]'));
 
+  // Per-browser tracking. Admin reads the same localStorage on the same device.
+  const ANALYTICS_KEY = 'ryker_analytics';
+  function track(metric, key) {
+    if (!key) return;
+    try {
+      const data = JSON.parse(localStorage.getItem(ANALYTICS_KEY) || '{}');
+      data[metric] = data[metric] || {};
+      data[metric][key] = (data[metric][key] || 0) + 1;
+      data._lastUpdated = new Date().toISOString();
+      localStorage.setItem(ANALYTICS_KEY, JSON.stringify(data));
+    } catch (_) {}
+  }
+
   function saveWishlist() {
     localStorage.setItem(WISHLIST_KEY, JSON.stringify([...wishlist]));
     const btn = document.getElementById('wishlistBtn');
@@ -258,6 +271,11 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     const showing = visible.length ? `${start + 1}–${start + visible.length}` : '0';
     filterMeta.textContent = `Showing ${showing} of ${filtered.length} · ${availCount} available`;
 
+    // Track search queries that returned zero results — owner's most valuable insight
+    if (currentSearch.trim() && filtered.length === 0) {
+      track('searchNoResults', currentSearch.trim().toLowerCase());
+    }
+
     gallery.innerHTML = visible.map(item => {
       const soldOut = isSoldOut(item);
       const avail = availSizes(item);
@@ -430,7 +448,7 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
       e.preventDefault(); e.stopPropagation();
       const id = heart.dataset.wishlist;
       if (wishlist.has(id)) wishlist.delete(id);
-      else wishlist.add(id);
+      else { wishlist.add(id); track('itemWishlist', id); }
       saveWishlist();
       render();
       return;
@@ -471,6 +489,13 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
         // Override the href with the size-specific URL
         enquire.href = whatsappLink(item, false, selected.dataset.size);
       }
+      track('itemEnquiries', id);
+    }
+    const igClick = e.target.closest('.btn-card.ig');
+    if (igClick) {
+      const card = igClick.closest('.card');
+      const wrap = card?.querySelector('[data-id]');
+      if (wrap) track('itemIgClicks', wrap.dataset.id);
     }
     // Size guide
     if (e.target.closest('[data-action="size-guide"]')) {
@@ -503,6 +528,7 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     const id = wrap.dataset.id;
     const item = items.find(i => i.id === id);
     if (!item) return;
+    track('itemViews', id);
     lightboxImages = itemImages(item);
     // Start at the slide the card is currently showing
     const carousel = wrap.querySelector('.card-carousel');

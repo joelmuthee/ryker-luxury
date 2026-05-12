@@ -1045,6 +1045,64 @@ document.getElementById('broadcastStartBtn')?.addEventListener('click', () => {
   next();
 });
 
+// ====== INSIGHTS (per-browser localStorage from the public site) ======
+const INSIGHTS_KEY = 'ryker_analytics';
+function loadInsights() {
+  try { return JSON.parse(localStorage.getItem(INSIGHTS_KEY) || '{}'); } catch { return {}; }
+}
+function renderInsights() {
+  const stats = loadInsights();
+  const grid = document.getElementById('insightsKpiGrid');
+  if (!grid) return;
+
+  const total = (map = {}) => Object.values(map).reduce((a, b) => a + b, 0);
+  grid.innerHTML = [
+    { label: 'Item views', val: total(stats.itemViews), sub: 'lightbox opens' },
+    { label: 'Enquiries', val: total(stats.itemEnquiries), sub: 'WhatsApp clicks', cls: 'success' },
+    { label: 'Saved (heart)', val: total(stats.itemWishlist), sub: 'wishlist adds' },
+    { label: 'IG clicks', val: total(stats.itemIgClicks), sub: 'View on IG taps' },
+  ].map(k => `
+    <div class="inv-kpi ${k.cls || ''}">
+      <div class="inv-kpi-label">${k.label}</div>
+      <div class="inv-kpi-val">${(k.val || 0).toLocaleString()}</div>
+      <div class="inv-kpi-sub">${k.sub}</div>
+    </div>`).join('');
+
+  function topItems(map = {}, n = 6) {
+    return Object.entries(map)
+      .map(([id, count]) => ({ id, count, bag: bags.find(b => b.id === id) }))
+      .filter(x => x.bag)
+      .sort((a, b) => b.count - a.count).slice(0, n);
+  }
+  function renderTopList(list, emptyMsg) {
+    if (!list.length) return `<p style="color:#999;font-size:13px;">${emptyMsg}</p>`;
+    return list.map(x => `
+      <div class="recent-row">
+        <img src="${x.bag.image}" alt="${escapeHtml(x.bag.name)}">
+        <div class="recent-body">
+          <div class="recent-name">${escapeHtml(x.bag.name)}</div>
+          <div class="recent-meta">${x.count} ${x.count === 1 ? 'time' : 'times'} · ${escapeHtml(x.bag.category || '')}</div>
+        </div>
+      </div>`).join('');
+  }
+  document.getElementById('insightsTopViews').innerHTML = renderTopList(topItems(stats.itemViews), 'No views yet.');
+  document.getElementById('insightsTopEnquiries').innerHTML = renderTopList(topItems(stats.itemEnquiries), 'No enquiries yet.');
+
+  // Search gaps — top no-result queries
+  const gapsEl = document.getElementById('insightsSearchGaps');
+  const gaps = Object.entries(stats.searchNoResults || {})
+    .sort((a, b) => b[1] - a[1]).slice(0, 8);
+  gapsEl.innerHTML = gaps.length
+    ? `<div style="display:flex;flex-wrap:wrap;gap:8px;">${gaps.map(([q, n]) => `<span class="search-gap-pill"><strong>"${escapeHtml(q)}"</strong> · ${n}×</span>`).join('')}</div>`
+    : '<p style="color:#999;font-size:13px;">No empty searches yet — shoppers find what they look for.</p>';
+}
+
+document.getElementById('insightsResetBtn')?.addEventListener('click', () => {
+  if (!confirm('Reset all insights on this device? This only affects this browser.')) return;
+  localStorage.removeItem(INSIGHTS_KEY);
+  renderInsights();
+  showToast('Insights reset on this device.');
+});
 
 async function init() {
   showToast('Loading…');
@@ -1056,6 +1114,7 @@ async function init() {
   renderBroadcastPicker();
   renderBroadcastRecipients();
   renderBroadcastPreview();
+  renderInsights();
 }
 
 checkAuth();

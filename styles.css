@@ -277,6 +277,19 @@ img { max-width: 100%; display: block; }
 .broadcast-recipient-meta { grid-column: 2 / -1; font-size: 11px; color: var(--ink-faint); }
 @media (max-width: 600px) { .broadcast-recipients { grid-template-columns: 1fr; } }
 
+/* Search-gap pills (Insights → searches with no results) */
+.search-gap-pill {
+  display: inline-block;
+  background: #fff4e0;
+  border: 1px solid #f0c060;
+  color: #a06000;
+  padding: 5px 12px;
+  border-radius: 99px;
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+}
+.search-gap-pill strong { color: #6e4000; }
+
 /* Modal open state */
 .modal { display: none; }
 .modal.open { display: flex; }
