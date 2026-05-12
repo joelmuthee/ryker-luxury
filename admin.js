@@ -237,23 +237,67 @@ document.getElementById('igQuickBtn')?.addEventListener('click', async () => {
 function getStockFromForm() {
   const stock = {};
   document.querySelectorAll('.stock-qty').forEach(inp => {
-    const size = inp.dataset.size;
+    const size = (inp.dataset.size || inp.value && inp.previousElementSibling?.value || '').trim();
+    // For custom-size rows the size NAME is in a sibling text input; the qty input has data-size empty
+    if (inp.classList.contains('stock-qty-custom')) return;  // handled below
     const val = parseInt(inp.value, 10);
-    if (!isNaN(val) && val > 0) stock[size] = val;
+    if (size && !isNaN(val) && val > 0) stock[size] = val;
+  });
+  // Custom rows: pair the size-name input with the qty input
+  document.querySelectorAll('.custom-size-row').forEach(row => {
+    const name = row.querySelector('.custom-size-name')?.value.trim();
+    const qty = parseInt(row.querySelector('.custom-size-qty')?.value, 10);
+    if (name && !isNaN(qty) && qty > 0) stock[name] = qty;
   });
   return stock;
 }
 
+// Sizes the standard fixed grids already cover (so we know what's "custom")
+const FIXED_GRID_SIZES = new Set([
+  'One Size',
+  'XS','S','M','L','XL','XXL','3XL','4XL','5XL',
+  '28','29','30','31','32','33','34','35','36','37','38','39','40','41','42','43','44',
+  'UK6','UK7','UK8','UK9','UK10','UK11','UK12'
+]);
+
 function setStockToForm(stock) {
   document.querySelectorAll('.stock-qty').forEach(inp => {
     const size = inp.dataset.size;
-    inp.value = stock && stock[size] > 0 ? stock[size] : '';
+    inp.value = stock && size && stock[size] > 0 ? stock[size] : '';
   });
+  // Repopulate custom rows from any sizes that aren't in the fixed grid
+  const customWrap = document.getElementById('customSizeRows');
+  if (customWrap) {
+    customWrap.innerHTML = '';
+    if (stock) {
+      Object.entries(stock).forEach(([size, qty]) => {
+        if (qty > 0 && !FIXED_GRID_SIZES.has(size)) addCustomSizeRow(size, qty);
+      });
+    }
+  }
 }
 
 function clearStockForm() {
   document.querySelectorAll('.stock-qty').forEach(inp => { inp.value = ''; });
+  const customWrap = document.getElementById('customSizeRows');
+  if (customWrap) customWrap.innerHTML = '';
 }
+
+// ====== CUSTOM SIZE ROWS ======
+function addCustomSizeRow(name = '', qty = '') {
+  const wrap = document.getElementById('customSizeRows');
+  if (!wrap) return;
+  const row = document.createElement('div');
+  row.className = 'custom-size-row';
+  row.innerHTML = `
+    <input type="text" class="custom-size-name" placeholder="Size name (e.g. EU 42, Free Size)" value="${escapeHtml(name)}">
+    <input type="number" min="0" step="1" class="custom-size-qty" placeholder="Qty" value="${qty || ''}">
+    <button type="button" class="btn-admin danger custom-size-remove" aria-label="Remove">×</button>
+  `;
+  row.querySelector('.custom-size-remove').addEventListener('click', () => row.remove());
+  wrap.appendChild(row);
+}
+document.getElementById('addCustomSizeBtn')?.addEventListener('click', () => addCustomSizeRow());
 
 // ====== AI DESCRIPTION ======
 document.getElementById('aiBtn').addEventListener('click', () => {

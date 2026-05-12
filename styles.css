@@ -705,6 +705,24 @@ html { scroll-behavior: smooth; }
 .stock-entry-item .size-lbl { font-size: 11px; font-weight: 700; color: var(--ink-soft); }
 .stock-entry-item input[type="number"] { width: 56px; text-align: center; padding: 7px 6px; font-size: 13px; }
 
+/* Custom-size rows */
+.custom-size-rows { display: flex; flex-direction: column; gap: 6px; }
+.custom-size-row {
+  display: grid;
+  grid-template-columns: 1fr 90px 36px;
+  gap: 6px;
+  align-items: center;
+}
+.custom-size-row input {
+  padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px;
+  font-family: inherit; font-size: 14px; background: #fff;
+}
+.custom-size-row .custom-size-qty { text-align: center; padding-left: 4px; padding-right: 4px; }
+.custom-size-row .custom-size-remove {
+  width: 36px; height: 36px; padding: 0; font-size: 20px;
+  display: flex; align-items: center; justify-content: center;
+}
+
 /* Bulk action bar */
 .bulk-bar {
   position: sticky; top: 64px; z-index: 40;

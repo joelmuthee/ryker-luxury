@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#3d2817">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=26">
+<link rel="stylesheet" href="styles.css?v=27">
 <script src="https://www.google.com/recaptcha/enterprise.js?render=6LeDBFwpAAAAAJe8ux9-imrqZ2ueRsEtdiWoDDpX" async defer></script>
 </head>
 <body style="background:#f8f6f2;">
@@ -263,19 +263,31 @@
           <div class="stock-entry-item"><span class="size-lbl">XL</span><input type="number" min="0" step="1" data-size="XL" class="stock-qty"></div>
           <div class="stock-entry-item"><span class="size-lbl">XXL</span><input type="number" min="0" step="1" data-size="XXL" class="stock-qty"></div>
           <div class="stock-entry-item"><span class="size-lbl">3XL</span><input type="number" min="0" step="1" data-size="3XL" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">4XL</span><input type="number" min="0" step="1" data-size="4XL" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">5XL</span><input type="number" min="0" step="1" data-size="5XL" class="stock-qty"></div>
         </div>
       </div>
 
       <div class="stock-entry-group" style="margin-top:10px;">
-        <label class="group-label">Numeric (jeans / shorts waist)</label>
+        <label class="group-label">Numeric (jeans / shorts waist) — every value 28 to 44</label>
         <div class="stock-entry-row" id="stockNumeric">
           <div class="stock-entry-item"><span class="size-lbl">28</span><input type="number" min="0" step="1" data-size="28" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">29</span><input type="number" min="0" step="1" data-size="29" class="stock-qty"></div>
           <div class="stock-entry-item"><span class="size-lbl">30</span><input type="number" min="0" step="1" data-size="30" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">31</span><input type="number" min="0" step="1" data-size="31" class="stock-qty"></div>
           <div class="stock-entry-item"><span class="size-lbl">32</span><input type="number" min="0" step="1" data-size="32" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">33</span><input type="number" min="0" step="1" data-size="33" class="stock-qty"></div>
           <div class="stock-entry-item"><span class="size-lbl">34</span><input type="number" min="0" step="1" data-size="34" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">35</span><input type="number" min="0" step="1" data-size="35" class="stock-qty"></div>
           <div class="stock-entry-item"><span class="size-lbl">36</span><input type="number" min="0" step="1" data-size="36" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">37</span><input type="number" min="0" step="1" data-size="37" class="stock-qty"></div>
           <div class="stock-entry-item"><span class="size-lbl">38</span><input type="number" min="0" step="1" data-size="38" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">39</span><input type="number" min="0" step="1" data-size="39" class="stock-qty"></div>
           <div class="stock-entry-item"><span class="size-lbl">40</span><input type="number" min="0" step="1" data-size="40" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">41</span><input type="number" min="0" step="1" data-size="41" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">42</span><input type="number" min="0" step="1" data-size="42" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">43</span><input type="number" min="0" step="1" data-size="43" class="stock-qty"></div>
+          <div class="stock-entry-item"><span class="size-lbl">44</span><input type="number" min="0" step="1" data-size="44" class="stock-qty"></div>
         </div>
       </div>
 
@@ -290,6 +302,12 @@
           <div class="stock-entry-item"><span class="size-lbl">UK11</span><input type="number" min="0" step="1" data-size="UK11" class="stock-qty"></div>
           <div class="stock-entry-item"><span class="size-lbl">UK12</span><input type="number" min="0" step="1" data-size="UK12" class="stock-qty"></div>
         </div>
+      </div>
+
+      <div class="stock-entry-group" style="margin-top:10px;">
+        <label class="group-label">Custom size <small style="font-weight:400;color:#999;">— anything not above (EU 42, Free Size, 46, etc.). Add as many as you need.</small></label>
+        <div class="custom-size-rows" id="customSizeRows"></div>
+        <button class="btn-admin" id="addCustomSizeBtn" type="button" style="font-size:12px;padding:6px 12px;margin-top:6px;">+ Add custom size</button>
       </div>
     </div>
 
@@ -385,6 +403,6 @@
   </div>
 </div>
 
-<script src="admin.js?v=14"></script>
+<script src="admin.js?v=15"></script>
 </body>
 </html>
