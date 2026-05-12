@@ -701,8 +701,25 @@ html { scroll-behavior: smooth; }
 .bulk-bar strong { font-size: 18px; font-family: var(--serif); color: var(--gold); margin-right: 4px; }
 .bulk-bar .btn-admin { padding: 6px 12px; font-size: 12.5px; }
 
-/* Admin list */
-.admin-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+/* Admin list — scrollable container so 200+ items don't extend the page forever */
+.admin-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  max-height: 720px;
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold) var(--surface);
+}
+.admin-list::-webkit-scrollbar { width: 10px; }
+.admin-list::-webkit-scrollbar-track { background: var(--surface); border-radius: 4px; }
+.admin-list::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 4px; }
+.admin-list::-webkit-scrollbar-thumb:hover { background: var(--gold-deep); }
+@media (max-width: 600px) { .admin-list { max-height: 540px; padding: 6px; } }
 .admin-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; position: relative; transition: 0.2s; }
 .admin-card.bulk-selected { box-shadow: 0 0 0 3px var(--gold); border-color: var(--gold); }
 .bulk-check {
