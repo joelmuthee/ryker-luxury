@@ -43,7 +43,6 @@
     <a href="#salesDash">Sales</a>
     <a href="#invDash">Inventory</a>
     <a href="#broadcastDash">WhatsApp Marketing</a>
-    <a href="#analyticsDash">Analytics</a>
     <a href="#allItems">All items <span class="admin-nav-count" id="navItemCount"></span></a>
   </nav>
 
@@ -118,23 +117,6 @@
         <button class="btn-admin" id="broadcastCopyBtn">Copy message only</button>
       </div>
       <p id="broadcastStatus" style="font-size:13px;color:var(--ink-soft);margin-top:10px;"></p>
-    </div>
-  </section>
-
-  <!-- ====== ANALYTICS ====== -->
-  <section class="dash" id="analyticsDash">
-    <h2 class="dash-title">Analytics</h2>
-    <p style="font-size:13.5px;color:var(--ink-soft);margin:-8px 0 16px;">What's being looked at and clicked. <strong>Data is per-browser</strong> (collected in localStorage), so this currently shows YOUR browsing of the public site. For visitor-wide stats, plug in Cloudflare Web Analytics or Plausible.</p>
-    <div class="inv-kpi-grid" id="analyticsKpiGrid"></div>
-    <div class="dash-grid" style="margin-top:18px;">
-      <div class="dash-card">
-        <h3>Most viewed items</h3>
-        <div id="analyticsTopViews" class="recent-list"></div>
-      </div>
-      <div class="dash-card">
-        <h3>Most enquired about</h3>
-        <div id="analyticsTopEnquiries" class="recent-list"></div>
-      </div>
     </div>
   </section>
 
@@ -373,6 +355,6 @@
   </div>
 </div>
 
-<script src="admin.js?v=9"></script>
+<script src="admin.js?v=10"></script>
 </body>
 </html>

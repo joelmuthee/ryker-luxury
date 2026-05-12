@@ -1045,57 +1045,6 @@ document.getElementById('broadcastStartBtn')?.addEventListener('click', () => {
   next();
 });
 
-// ====== ANALYTICS ======
-const ANALYTICS_KEY = 'ryker_analytics';
-function loadAnalytics() {
-  try { return JSON.parse(localStorage.getItem(ANALYTICS_KEY) || '{}'); }
-  catch { return {}; }
-}
-function renderAnalytics() {
-  const stats = loadAnalytics();
-  const grid = document.getElementById('analyticsKpiGrid');
-  if (!grid) return;
-
-  const totalViews = Object.values(stats.itemViews || {}).reduce((a, b) => a + b, 0);
-  const totalEnquiries = Object.values(stats.itemEnquiries || {}).reduce((a, b) => a + b, 0);
-  const totalWishlist = Object.values(stats.itemWishlist || {}).reduce((a, b) => a + b, 0);
-  const totalIgClicks = Object.values(stats.itemIgClicks || {}).reduce((a, b) => a + b, 0);
-
-  grid.innerHTML = [
-    { label: 'Item views', val: totalViews.toLocaleString(), sub: 'lightbox opens', cls: '' },
-    { label: 'Enquiries', val: totalEnquiries.toLocaleString(), sub: 'WhatsApp clicks', cls: 'success' },
-    { label: 'Saved by buyers', val: totalWishlist.toLocaleString(), sub: 'wishlist hearts', cls: '' },
-    { label: 'IG clicks', val: totalIgClicks.toLocaleString(), sub: 'View on IG taps', cls: '' },
-  ].map(k => `
-    <div class="inv-kpi ${k.cls}">
-      <div class="inv-kpi-label">${k.label}</div>
-      <div class="inv-kpi-val">${k.val}</div>
-      <div class="inv-kpi-sub">${k.sub}</div>
-    </div>`).join('');
-
-  function topN(map = {}, n = 6) {
-    return Object.entries(map)
-      .map(([id, count]) => ({ id, count, bag: bags.find(b => b.id === id) }))
-      .filter(x => x.bag)
-      .sort((a, b) => b.count - a.count)
-      .slice(0, n);
-  }
-
-  function renderTopList(list, emptyMsg) {
-    if (!list.length) return `<p style="color:#999;font-size:13px;">${emptyMsg}</p>`;
-    return list.map(x => `
-      <div class="recent-row">
-        <img src="${x.bag.image}" alt="${escapeHtml(x.bag.name)}">
-        <div class="recent-body">
-          <div class="recent-name">${escapeHtml(x.bag.name)}</div>
-          <div class="recent-meta">${x.count} ${x.count === 1 ? 'time' : 'times'} · ${escapeHtml(x.bag.category || '')}</div>
-        </div>
-      </div>`).join('');
-  }
-
-  document.getElementById('analyticsTopViews').innerHTML = renderTopList(topN(stats.itemViews), 'No views yet.');
-  document.getElementById('analyticsTopEnquiries').innerHTML = renderTopList(topN(stats.itemEnquiries), 'No enquiries yet.');
-}
 
 async function init() {
   showToast('Loading…');
@@ -1107,7 +1056,6 @@ async function init() {
   renderBroadcastPicker();
   renderBroadcastRecipients();
   renderBroadcastPreview();
-  renderAnalytics();
 }
 
 checkAuth();
