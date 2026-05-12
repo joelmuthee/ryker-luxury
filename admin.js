@@ -809,7 +809,7 @@ function renderList() {
         <div class="admin-card-stock">${units} in stock · ${sold} sold | ${stockSummary}</div>
         <div class="admin-card-actions">
           <button onclick="editItem('${bag.id}')">Edit</button>
-          <button onclick="openSaleModal('${bag.id}')" style="background:#f0faf4;border-color:#b0d8c0;color:#1a7a40;">Record sale</button>
+          <button onclick="openSaleModal('${bag.id}')" style="background:#f0faf4;border-color:#b0d8c0;color:#1a7a40;">Sell</button>
           <button onclick="openRestockModal('${bag.id}')">Restock</button>
           <button class="danger" onclick="deleteItem('${bag.id}')">Delete</button>
         </div>
