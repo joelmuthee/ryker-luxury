@@ -371,7 +371,9 @@ img { max-width: 100%; display: block; }
 .size-hint {
   font-size: 11px; color: #b00020; letter-spacing: 0.02em;
   font-weight: 600; font-style: italic; margin-left: 6px;
+  display: none;  /* hidden until user tries to enquire without a size */
 }
+.size-chips.prompted .size-hint { display: inline; }
 .size-chips.pickable:has(.size-chip.selected) .size-hint { display: none; }
 .size-chips.shake { animation: chipShake 0.45s ease; }
 @keyframes chipShake {

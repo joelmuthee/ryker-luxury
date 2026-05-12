@@ -460,8 +460,10 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
       const card = chip.closest('.card');
       card.querySelectorAll('.size-chip').forEach(c => c.classList.remove('selected'));
       chip.classList.add('selected');
-      // Clear the "shake" prompt if it's mid-animation
-      card.querySelector('.size-chips')?.classList.remove('shake');
+      // Clear any active prompt + shake
+      const chipsRow = card.querySelector('.size-chips');
+      chipsRow?.classList.remove('shake');
+      chipsRow?.classList.remove('prompted');
       return;
     }
     // Enquire click — enforce size pick when needed
@@ -482,6 +484,7 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
           e.preventDefault();
           showToast('Pick your size first to continue');
           const chips = card.querySelector('.size-chips');
+          chips?.classList.add('prompted');     // reveals the inline 'Pick a size first' hint
           chips?.classList.add('shake');
           setTimeout(() => chips?.classList.remove('shake'), 600);
           return;
