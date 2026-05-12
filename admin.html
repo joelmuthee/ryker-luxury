@@ -40,12 +40,25 @@
   <!-- ====== QUICK NAV ====== -->
   <nav class="admin-nav" id="adminNav">
     <a href="#addForm" class="admin-nav-cta">+ Add new item</a>
+    <a href="#allItems">All items <span class="admin-nav-count" id="navItemCount"></span></a>
     <a href="#salesDash">Sales</a>
     <a href="#invDash">Inventory</a>
     <a href="#broadcastDash">WhatsApp Marketing</a>
     <a href="#insightsDash">Insights</a>
-    <a href="#allItems">All items <span class="admin-nav-count" id="navItemCount"></span></a>
   </nav>
+
+  <!-- ====== ITEM LIST (lifted to the top — most common task) ====== -->
+  <div class="section-divider" id="allItems">
+    All items <span id="bagCount">0</span>
+    <button class="btn-admin" style="margin-left:auto;font-size:12px;padding:6px 12px;" onclick="bulkSelectAll()">Select all</button>
+  </div>
+  <div class="bulk-bar" id="bulkActions" style="display:none;">
+    <span><strong id="bulkCount">0</strong> selected</span>
+    <button class="btn-admin" onclick="bulkSetCategory()">Set category</button>
+    <button class="btn-admin danger" onclick="bulkDelete()">Delete</button>
+    <button class="btn-admin" onclick="bulkClear()">Clear</button>
+  </div>
+  <div class="admin-list" id="adminList"></div>
 
   <!-- ====== SALES DASHBOARD ====== -->
   <section class="dash" id="salesDash">
@@ -299,19 +312,6 @@
     </div>
   </div>
 
-  <!-- ====== ITEM LIST ====== -->
-  <div class="section-divider" id="allItems">
-    All items <span id="bagCount">0</span>
-    <button class="btn-admin" style="margin-left:auto;font-size:12px;padding:6px 12px;" onclick="bulkSelectAll()">Select all</button>
-  </div>
-  <!-- Bulk action bar — shows when items are selected -->
-  <div class="bulk-bar" id="bulkActions" style="display:none;">
-    <span><strong id="bulkCount">0</strong> selected</span>
-    <button class="btn-admin" onclick="bulkSetCategory()">Set category</button>
-    <button class="btn-admin danger" onclick="bulkDelete()">Delete</button>
-    <button class="btn-admin" onclick="bulkClear()">Clear</button>
-  </div>
-  <div class="admin-list" id="adminList"></div>
 
 </div><!-- /dashboard -->
 
