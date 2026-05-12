@@ -263,7 +263,7 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
       const avail = availSizes(item);
       const pickRequired = !soldOut && avail.length > 1;
       const sizesHtml = avail.length
-        ? `<div class="size-chips${pickRequired ? ' pickable' : ''}">${avail.map(s => `<button type="button" class="size-chip" data-size="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join('')}${pickRequired ? '<span class="size-hint">Pick a size to enquire</span>' : ''}</div>`
+        ? `<div class="size-chips${pickRequired ? ' pickable' : ''}">${avail.map(s => `<button type="button" class="size-chip" data-size="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join('')}${pickRequired ? '<span class="size-hint">Pick a size first</span>' : ''}</div>`
         : '';
       const catBadge = item.category ? `<span class="badge-cat">${escapeHtml(item.category)}</span>` : '';
       const isNewItem = isNew(item);

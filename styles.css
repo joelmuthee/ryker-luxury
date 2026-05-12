@@ -315,8 +315,8 @@ img { max-width: 100%; display: block; }
 .size-chips.pickable .size-chip:hover { border-color: var(--gold); background: var(--gold-light); color: var(--ink); }
 .size-chips.pickable .size-chip.selected { background: var(--ink); color: var(--gold-light); border-color: var(--ink); }
 .size-hint {
-  font-size: 10.5px; color: var(--gold-deep); letter-spacing: 0.04em;
-  font-style: italic; margin-left: 4px;
+  font-size: 11px; color: #b00020; letter-spacing: 0.02em;
+  font-weight: 600; font-style: italic; margin-left: 6px;
 }
 .size-chips.pickable:has(.size-chip.selected) .size-hint { display: none; }
 .size-chips.shake { animation: chipShake 0.45s ease; }
