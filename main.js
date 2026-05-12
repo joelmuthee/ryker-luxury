@@ -102,14 +102,33 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     return hasSales;
   }
 
-  function whatsappLink(item, soldOut) {
+  function whatsappLink(item, soldOut, selectedSize) {
     const phone = settings.whatsappNumber || '254714672436';
     const avail = availSizes(item);
-    const sizePart = avail.length ? ` (sizes: ${avail.join(', ')})` : '';
+    let sizePart = '';
+    if (!soldOut) {
+      if (selectedSize) sizePart = ` (size ${selectedSize})`;
+      else if (avail.length === 1) sizePart = ` (size ${avail[0]})`;
+      // multi-size with nothing selected → no size in URL; click handler should block before reaching here
+    }
     const msg = soldOut
       ? `Hi Ryker! I saw *${item.name}* is sold out. Will it be back in stock? I'd love to reserve one.`
       : `Hi Ryker! I'd like to enquire about *${item.name}*${sizePart} (${fmtPrice(item.price)}) from your catalog.`;
     return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+  }
+
+  function showToast(msg) {
+    let toast = document.getElementById('publicToast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'publicToast';
+      toast.className = 'public-toast';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => toast.classList.remove('show'), 2800);
   }
 
   function escapeHtml(s) {
@@ -255,8 +274,9 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     gallery.innerHTML = visible.map(item => {
       const soldOut = isSoldOut(item);
       const avail = availSizes(item);
+      const pickRequired = !soldOut && avail.length > 1;
       const sizesHtml = avail.length
-        ? `<div class="size-chips">${avail.map(s => `<span class="size-chip">${escapeHtml(s)}</span>`).join('')}</div>`
+        ? `<div class="size-chips${pickRequired ? ' pickable' : ''}">${avail.map(s => `<button type="button" class="size-chip" data-size="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join('')}${pickRequired ? '<span class="size-hint">Pick a size to enquire</span>' : ''}</div>`
         : '';
       const catBadge = item.category ? `<span class="badge-cat">${escapeHtml(item.category)}</span>` : '';
       const isNewItem = isNew(item);
@@ -428,12 +448,43 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
       render();
       return;
     }
-    // Track enquire (WA) and IG clicks
+    // Size-chip click — select that size, deselect siblings
+    const chip = e.target.closest('.size-chip[data-size]');
+    if (chip) {
+      e.preventDefault(); e.stopPropagation();
+      const card = chip.closest('.card');
+      card.querySelectorAll('.size-chip').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected');
+      // Clear the "shake" prompt if it's mid-animation
+      card.querySelector('.size-chips')?.classList.remove('shake');
+      return;
+    }
+    // Enquire click — enforce size pick when needed
     const enquire = e.target.closest('.btn-card.primary');
     if (enquire) {
       const card = enquire.closest('.card');
       const wrap = card?.querySelector('[data-id]');
-      if (wrap) track('itemEnquiries', wrap.dataset.id);
+      if (!wrap) return;
+      const id = wrap.dataset.id;
+      const item = items.find(i => i.id === id);
+      if (!item) return;
+      const soldOut = isSoldOut(item);
+      const avail = availSizes(item);
+      // Require size selection when multiple sizes exist and item isn't sold out
+      if (!soldOut && avail.length > 1) {
+        const selected = card.querySelector('.size-chip.selected');
+        if (!selected) {
+          e.preventDefault();
+          showToast('Pick your size first to continue');
+          const chips = card.querySelector('.size-chips');
+          chips?.classList.add('shake');
+          setTimeout(() => chips?.classList.remove('shake'), 600);
+          return;
+        }
+        // Override the href with the size-specific URL
+        enquire.href = whatsappLink(item, false, selected.dataset.size);
+      }
+      track('itemEnquiries', id);
     }
     const igClick = e.target.closest('.btn-card.ig');
     if (igClick) {

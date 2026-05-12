@@ -303,9 +303,44 @@ img { max-width: 100%; display: block; }
 .badge-sold { position: absolute; top: 14px; left: 14px; background: var(--choco-deep); color: var(--gold); font-size: 11px; letter-spacing: 0.2em; padding: 6px 12px; border-radius: 4px; font-weight: 700; text-transform: uppercase; border: 1px solid var(--gold); }
 .badge-cat { position: absolute; top: 14px; right: 14px; background: rgba(42,28,15,0.78); color: #fff; font-size: 10px; letter-spacing: 0.12em; padding: 4px 10px; border-radius: 4px; font-weight: 600; text-transform: uppercase; }
 
-.size-chips { display: flex; flex-wrap: wrap; gap: 5px; }
-.size-chip { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; font-size: 11px; font-weight: 600; padding: 3px 9px; color: var(--ink); letter-spacing: 0.04em; }
+.size-chips { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.size-chip {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 4px;
+  font-size: 11px; font-weight: 600; padding: 3px 9px;
+  color: var(--ink); letter-spacing: 0.04em;
+  font-family: inherit; cursor: default;
+}
 .size-chip.low { border-color: #e8a010; color: #a06000; background: #fff8e8; }
+.size-chips.pickable .size-chip { cursor: pointer; transition: 0.15s; padding: 4px 11px; }
+.size-chips.pickable .size-chip:hover { border-color: var(--gold); background: var(--gold-light); color: var(--ink); }
+.size-chips.pickable .size-chip.selected { background: var(--ink); color: var(--gold-light); border-color: var(--ink); }
+.size-hint {
+  font-size: 10.5px; color: var(--gold-deep); letter-spacing: 0.04em;
+  font-style: italic; margin-left: 4px;
+}
+.size-chips.pickable:has(.size-chip.selected) .size-hint { display: none; }
+.size-chips.shake { animation: chipShake 0.45s ease; }
+@keyframes chipShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+
+/* Public-site toast */
+.public-toast {
+  position: fixed;
+  bottom: 24px; left: 50%;
+  transform: translateX(-50%) translateY(140%);
+  background: var(--choco-deep); color: var(--gold-light);
+  padding: 12px 22px; border-radius: 999px;
+  font-size: 14px; font-weight: 600;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.28);
+  z-index: 2000; transition: transform 0.28s ease;
+  max-width: calc(100vw - 32px); text-align: center;
+}
+.public-toast.show { transform: translateX(-50%) translateY(0); }
 
 .card-body { padding: 18px 20px 20px; flex: 1; display: flex; flex-direction: column; gap: 10px; }
 .card-title { font-family: var(--serif); font-size: 20px; font-weight: 600; color: var(--ink); line-height: 1.2; }
