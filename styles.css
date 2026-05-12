@@ -761,11 +761,12 @@ html { scroll-behavior: smooth; }
   }
   /* Hide the category badge row on mobile — saves vertical space, category is in the name anyway */
   .admin-card-body > div[style*="margin:3px 0"] { display: none; }
-  .admin-card-price { font-size: 12px; margin-top: 1px; }
-  .admin-card-stock {
-    font-size: 10.5px; margin-top: 1px;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  .admin-card-price { font-size: 12px; margin-top: 2px; color: var(--ink); font-weight: 600; }
+  .admin-card-price .admin-card-mobile-stock {
+    display: inline; font-weight: 400; font-size: 11px; color: var(--ink-faint);
   }
+  /* Hide the verbose stock-summary line on mobile — already inlined into price line above */
+  .admin-card-stock { display: none; }
   /* All four action buttons must fit in ONE row */
   .admin-card-actions {
     gap: 3px; margin-top: 5px; flex-wrap: nowrap;
@@ -810,6 +811,7 @@ html { scroll-behavior: smooth; }
 .admin-card-name { font-family: var(--serif); font-size: 16px; font-weight: 600; margin-bottom: 4px; }
 .admin-card-price { color: var(--gold-deep); font-weight: 600; font-size: 14px; }
 .admin-card-stock { font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
+.admin-card-mobile-stock { display: none; }  /* hidden on desktop — full stock line below covers it */
 .admin-card-actions { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
 .admin-card-actions button { flex: 1; padding: 7px 8px; font-size: 12px; border-radius: 6px; border: 1px solid var(--line); background: #fff; cursor: pointer; font-family: inherit; transition: 0.15s; }
 .admin-card-actions button:hover { background: var(--ink); color: var(--gold-light); border-color: var(--ink); }

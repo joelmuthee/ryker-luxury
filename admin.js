@@ -804,8 +804,8 @@ function renderList() {
       <img src="${bag.image}" alt="${escapeHtml(bag.name)}">
       <div class="admin-card-body">
         <div class="admin-card-name">${escapeHtml(bag.name)}</div>
-        ${bag.category ? `<div style="margin:3px 0;"><span style="background:#f0ede8;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:600;">${escapeHtml(bag.category)}</span></div>` : ''}
-        <div class="admin-card-price">${fmtKsh(bag.price)}</div>
+        ${bag.category ? `<div class="admin-card-cat-row" style="margin:3px 0;"><span style="background:#f0ede8;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:600;">${escapeHtml(bag.category)}</span></div>` : ''}
+        <div class="admin-card-price">${fmtKsh(bag.price)}<span class="admin-card-mobile-stock"> · ${units} in stock</span></div>
         <div class="admin-card-stock">${units} in stock · ${sold} sold | ${stockSummary}</div>
         <div class="admin-card-actions">
           <button onclick="editItem('${bag.id}')">Edit</button>
