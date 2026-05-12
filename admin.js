@@ -776,13 +776,22 @@ function renderInventory() {
 // ====== ITEM LIST ======
 let bulkSelected = new Set();
 
+let adminItemSearch = '';
 function renderList() {
   const list = document.getElementById('adminList');
   document.getElementById('bagCount').textContent = bags.length;
   const navCount = document.getElementById('navItemCount');
   if (navCount) navCount.textContent = bags.length;
   renderBulkBar();
-  list.innerHTML = bags.map(bag => {
+  // Filter by search query — name + category match (case-insensitive)
+  const q = adminItemSearch.trim().toLowerCase();
+  const filtered = q
+    ? bags.filter(b => `${b.name} ${b.category || ''}`.toLowerCase().includes(q))
+    : bags;
+  // Update search count line
+  const countEl = document.getElementById('adminItemSearchCount');
+  if (countEl) countEl.textContent = q ? `${filtered.length} match${filtered.length === 1 ? '' : 'es'}` : '';
+  list.innerHTML = filtered.map(bag => {
     const units = totalStock(bag);
     const sold = totalUnitsSold(bag);
     const stockSummary = Object.entries(bag.stock || {}).map(([sz, q]) => `${sz}:${q}`).join(' · ') || 'No stock set';
@@ -1102,6 +1111,17 @@ document.getElementById('insightsResetBtn')?.addEventListener('click', () => {
   localStorage.removeItem(INSIGHTS_KEY);
   renderInsights();
   showToast('Insights reset on this device.');
+});
+
+// Admin item search — debounced
+const adminItemSearchInput = document.getElementById('adminItemSearch');
+let adminSearchTimer;
+adminItemSearchInput?.addEventListener('input', () => {
+  clearTimeout(adminSearchTimer);
+  adminSearchTimer = setTimeout(() => {
+    adminItemSearch = adminItemSearchInput.value;
+    renderList();
+  }, 160);
 });
 
 async function init() {
