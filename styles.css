@@ -44,17 +44,24 @@ img { max-width: 100%; display: block; }
   .hero-title   { animation: fadeUp 0.8s 0.20s cubic-bezier(0.22,0.61,0.36,1) both; }
   .hero-sub     { animation: fadeUp 0.7s 0.38s cubic-bezier(0.22,0.61,0.36,1) both; }
   .hero-cta     { animation: fadeUp 0.7s 0.52s cubic-bezier(0.22,0.61,0.36,1) both; }
-  /* Card stagger — re-triggers on every render() (filter/page change) */
-  .gallery .card { animation: fadeUp 0.55s cubic-bezier(0.22,0.61,0.36,1) both; }
-  .gallery .card:nth-child(2)  { animation-delay: 0.04s; }
-  .gallery .card:nth-child(3)  { animation-delay: 0.08s; }
-  .gallery .card:nth-child(4)  { animation-delay: 0.12s; }
-  .gallery .card:nth-child(5)  { animation-delay: 0.16s; }
-  .gallery .card:nth-child(6)  { animation-delay: 0.20s; }
-  .gallery .card:nth-child(7)  { animation-delay: 0.24s; }
-  .gallery .card:nth-child(8)  { animation-delay: 0.28s; }
-  .gallery .card:nth-child(9)  { animation-delay: 0.32s; }
-  .gallery .card:nth-child(n+10) { animation-delay: 0.36s; }
+  /* Card stagger — paused until each card scrolls into view, so cards below
+     the fold on initial load animate when the user scrolls to them, not
+     before. On filter/page change, the IO fires immediately because the
+     gallery is already on-screen. */
+  .gallery .card {
+    animation: fadeUp 0.65s cubic-bezier(0.22,0.61,0.36,1) both;
+    animation-play-state: paused;
+  }
+  .gallery .card.in-view { animation-play-state: running; }
+  .gallery .card:nth-child(2)  { animation-delay: 0.06s; }
+  .gallery .card:nth-child(3)  { animation-delay: 0.12s; }
+  .gallery .card:nth-child(4)  { animation-delay: 0.18s; }
+  .gallery .card:nth-child(5)  { animation-delay: 0.24s; }
+  .gallery .card:nth-child(6)  { animation-delay: 0.30s; }
+  .gallery .card:nth-child(7)  { animation-delay: 0.36s; }
+  .gallery .card:nth-child(8)  { animation-delay: 0.42s; }
+  .gallery .card:nth-child(9)  { animation-delay: 0.48s; }
+  .gallery .card:nth-child(n+10) { animation-delay: 0.54s; }
 }
 
 /* ===== NAV ===== */

@@ -22,6 +22,22 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
   let currentPage = 1;
   let wishlist = new Set(JSON.parse(localStorage.getItem(WISHLIST_KEY) || '[]'));
 
+  // IntersectionObserver for gallery cards. Each new card from render() gets
+  // observed; once it scrolls into view (or already is, e.g. after a filter
+  // change while gallery is visible), the .in-view class un-pauses its CSS
+  // fade-up animation. One-shot per element.
+  const reducedMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const cardObserver = (window.IntersectionObserver && !reducedMotion)
+    ? new IntersectionObserver(entries => {
+        entries.forEach(e => {
+          if (e.isIntersecting) {
+            e.target.classList.add('in-view');
+            cardObserver.unobserve(e.target);
+          }
+        });
+      }, { threshold: 0.05, rootMargin: '0px 0px -20px 0px' })
+    : null;
+
   // Per-browser tracking. Admin reads the same localStorage on the same device.
   const ANALYTICS_KEY = 'ryker_analytics';
   function track(metric, key) {
@@ -328,6 +344,17 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
 
     if (!visible.length) {
       gallery.innerHTML = '<p style="color:var(--ink-faint);padding:40px 0;text-align:center;grid-column:1/-1;">No items match this filter.</p>';
+    }
+
+    // Observe each card so its fade-up animation un-pauses when it scrolls
+    // into view. Cards above the fold (filter/page changes while gallery is
+    // visible) fire immediately. Cards below the fold (initial load before
+    // user scrolls) wait until they're in view, then animate.
+    if (cardObserver) {
+      gallery.querySelectorAll('.card').forEach(card => cardObserver.observe(card));
+    } else {
+      // No IO support OR reduced motion preference — show cards immediately
+      gallery.querySelectorAll('.card').forEach(card => card.classList.add('in-view'));
     }
 
     // Numbered pagination
