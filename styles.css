@@ -27,6 +27,36 @@ a { color: inherit; text-decoration: none; }
 img { max-width: 100%; display: block; }
 .container { width: min(1200px, 92%); margin: 0 auto; }
 
+/* ===== FADE-IN-UP ANIMATIONS =====
+   Subtle reveal motion. .fade-up sits at translateY(20px) + opacity 0 until
+   the element either (a) is observed in view by main.js or (b) auto-fires
+   on page load for elements above the fold (hero stagger). Disabled
+   entirely when the user prefers reduced motion. */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(22px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .fade-up { opacity: 0; transform: translateY(22px); transition: opacity 0.65s cubic-bezier(0.22,0.61,0.36,1), transform 0.65s cubic-bezier(0.22,0.61,0.36,1); }
+  .fade-up.in-view { opacity: 1; transform: translateY(0); }
+  /* Hero stagger — auto-fires on load, no JS needed */
+  .hero-eyebrow { animation: fadeUp 0.7s 0.05s cubic-bezier(0.22,0.61,0.36,1) both; }
+  .hero-title   { animation: fadeUp 0.8s 0.20s cubic-bezier(0.22,0.61,0.36,1) both; }
+  .hero-sub     { animation: fadeUp 0.7s 0.38s cubic-bezier(0.22,0.61,0.36,1) both; }
+  .hero-cta     { animation: fadeUp 0.7s 0.52s cubic-bezier(0.22,0.61,0.36,1) both; }
+  /* Card stagger — re-triggers on every render() (filter/page change) */
+  .gallery .card { animation: fadeUp 0.55s cubic-bezier(0.22,0.61,0.36,1) both; }
+  .gallery .card:nth-child(2)  { animation-delay: 0.04s; }
+  .gallery .card:nth-child(3)  { animation-delay: 0.08s; }
+  .gallery .card:nth-child(4)  { animation-delay: 0.12s; }
+  .gallery .card:nth-child(5)  { animation-delay: 0.16s; }
+  .gallery .card:nth-child(6)  { animation-delay: 0.20s; }
+  .gallery .card:nth-child(7)  { animation-delay: 0.24s; }
+  .gallery .card:nth-child(8)  { animation-delay: 0.28s; }
+  .gallery .card:nth-child(9)  { animation-delay: 0.32s; }
+  .gallery .card:nth-child(n+10) { animation-delay: 0.36s; }
+}
+
 /* ===== NAV ===== */
 .nav {
   position: sticky; top: 0;

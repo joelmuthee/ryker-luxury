@@ -657,6 +657,23 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
   document.getElementById('year').textContent = new Date().getFullYear();
   saveWishlist();
 
+  // Scroll-triggered fade-up (skips if user prefers reduced motion). One-shot:
+  // once an element reveals, the observer stops watching it.
+  if (window.IntersectionObserver && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const fadeIO = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('in-view');
+          fadeIO.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('.fade-up').forEach(el => fadeIO.observe(el));
+  } else {
+    // Reduced motion or no IO support — show everything immediately
+    document.querySelectorAll('.fade-up').forEach(el => el.classList.add('in-view'));
+  }
+
   await loadData();
   render();
 })();
