@@ -909,25 +909,13 @@ html { scroll-behavior: smooth; }
   .btn { padding: 13px 22px; font-size: 13px; }
   .filters { padding: 40px 0 16px; }
   .section-title { font-size: clamp(32px, 9vw, 44px); }
-  /* Single-row horizontal scroll for filter pills on mobile (cleaner than wrap) */
-  .filter-pills--cats, .filter-pills--sizes {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scroll-snap-type: x proximity;
-    padding-bottom: 6px;
-    /* Bleed to edges so the row indicates scrollability */
-    margin-left: -16px;
-    margin-right: -16px;
-    padding-left: 16px;
-    padding-right: 16px;
-    scrollbar-width: thin;
+  /* Filter pills wrap to multiple rows on mobile (no horizontal scroll) */
+  .filter-pills--cats, .filter-pills--sizes, .filter-pills--branches {
+    flex-wrap: wrap;
+    gap: 6px;
   }
   .filters-bar { width: 100%; }
   .filters-bar .filter-pills { width: auto; }
-  .filter-pills--cats::-webkit-scrollbar, .filter-pills--sizes::-webkit-scrollbar { height: 3px; }
-  .filter-pills--cats::-webkit-scrollbar-thumb, .filter-pills--sizes::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 99px; }
-  .filter-pills--cats .pill, .filter-pills--sizes .pill { flex-shrink: 0; scroll-snap-align: start; }
   .gallery { grid-template-columns: 1fr 1fr; gap: 14px; padding: 12px 0 50px; }
   .card-body { padding: 11px 12px 12px; gap: 6px; }
   .card-title { font-size: 16px; line-height: 1.2; }
