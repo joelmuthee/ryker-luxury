@@ -28,6 +28,21 @@ const b64ToBytes = b64 => {
   return bytes;
 };
 
+// Decode HTML entities IG slathers across og:description and the embed Caption
+// div. Named entities + decimal (&#064;) + hex (&#x40;). Per CATALOG-STANDARDS
+// "Instagram quick-add — Caption pre-processing" rules. Mostly cosmetic for
+// ryker (new-stock model, no @<price> parser) but keeps descriptions clean.
+const decodeEntities = (s) => (s || "")
+  .replace(/&amp;/g, "&")
+  .replace(/&quot;/g, '"')
+  .replace(/&#39;/g, "'")
+  .replace(/&apos;/g, "'")
+  .replace(/&lt;/g, "<")
+  .replace(/&gt;/g, ">")
+  .replace(/&nbsp;/g, " ")
+  .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
+  .replace(/&#x([0-9a-fA-F]+);/g, (_, n) => String.fromCharCode(parseInt(n, 16)));
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
@@ -125,7 +140,13 @@ export default {
       const igUrl = url.searchParams.get("url");
       if (!igUrl) return json({ error: "url required" }, 400);
 
-      const m = igUrl.match(/instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/i);
+      // Accept all IG public URL shapes that carry a shortcode:
+      //   /p/<code>/         photo posts
+      //   /reel/<code>/      single reel
+      //   /reels/<code>/     plural — some share sheets emit this
+      //   /tv/<code>/        IGTV
+      //   /share/reel/<code>/, /share/p/<code>/   share-sheet shortlinks
+      const m = igUrl.match(/instagram\.com\/(?:share\/)?(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i);
       if (!m) return json({ error: "not an Instagram post URL" }, 400);
       const code = m[1];
 
@@ -155,10 +176,10 @@ export default {
             || html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i);
           if (img) imageUrl = img[1].replace(/&amp;/g, "&");
           const capDiv = html.match(/<div[^>]+class=["'][^"']*Caption[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
-          if (capDiv) caption = capDiv[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+          if (capDiv) caption = decodeEntities(capDiv[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
           if (!caption) {
             const desc = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i);
-            if (desc) caption = desc[1].replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+            if (desc) caption = decodeEntities(desc[1]);
           }
         }
 
@@ -207,7 +228,7 @@ export default {
             const desc = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i);
             if (img) imageUrl = img[1].replace(/&amp;/g, "&");
             if (desc && !caption) {
-              caption = desc[1].replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+              caption = decodeEntities(desc[1]);
               const m1 = caption.match(/^"(.+)"\s*-\s*@/s);
               if (m1) caption = m1[1];
             }
@@ -225,6 +246,35 @@ export default {
           caption,
           postUrl: `https://www.instagram.com/p/${code}/`,
           isCarousel: imageUrls.length > 1,
+        });
+      } catch (err) {
+        return json({ error: err.message }, 502);
+      }
+    }
+
+    // ---- IG image proxy: pipe an IG CDN image through the worker so the admin
+    //      can download it without hitting CORS (IG CDN doesn't send ACAO).
+    if (request.method === "GET" && path === "/api/ig-proxy") {
+      const target = url.searchParams.get("url");
+      if (!target) return json({ error: "url required" }, 400);
+      try {
+        const u = new URL(target);
+        if (!/cdninstagram\.com$|fbcdn\.net$/.test(u.hostname)) {
+          return json({ error: "host not allowed" }, 400);
+        }
+        const res = await fetch(target, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Referer": "https://www.instagram.com/",
+          },
+        });
+        if (!res.ok) return json({ error: `upstream ${res.status}` }, 502);
+        return new Response(res.body, {
+          headers: {
+            "Content-Type": res.headers.get("Content-Type") || "image/jpeg",
+            "Cache-Control": "public, max-age=3600",
+            "Access-Control-Allow-Origin": "*",
+          },
         });
       } catch (err) {
         return json({ error: err.message }, 502);
