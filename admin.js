@@ -184,9 +184,11 @@ document.getElementById('igQuickBtn')?.addEventListener('click', async () => {
     const data = await r.json();
     if (!r.ok || data.error) throw new Error(data.error || 'Fetch failed');
 
-    // Download the cover (first image) through the browser, stage as main image
-    async function downloadAndStage(url) {
-      const r = await fetch(url);
+    // Download the cover (first image) through the worker proxy — IG CDN blocks
+    // direct browser fetches with CORS, so we hop via /api/ig-proxy which adds ACAO.
+    async function downloadAndStage(imgUrl) {
+      const proxied = `${API_BASE}/api/ig-proxy?url=${encodeURIComponent(imgUrl)}`;
+      const r = await fetch(proxied);
       if (!r.ok) throw new Error('Image download failed');
       const blob = await r.blob();
       return new Promise((resolve, reject) => {
@@ -345,14 +347,14 @@ document.getElementById('cancelBtn').addEventListener('click', resetForm);
 
 async function saveItem() {
   const name = document.getElementById('nameInput').value.trim();
-  const price = parseInt(document.getElementById('priceInput').value, 10);
+  const priceRaw = document.getElementById('priceInput').value.trim();
+  const price = priceRaw === '' ? 0 : parseInt(priceRaw, 10);
   const desc = document.getElementById('descInput').value.trim();
   const category = document.getElementById('categoryInput').value || '';
-  const branch = document.getElementById('branchInput')?.value || '';
   const stock = getStockFromForm();
 
   if (!name) { showToast('Item name is required.'); return; }
-  if (!price || price < 0) { showToast('Enter a valid price.'); return; }
+  if (isNaN(price) || price < 0) { showToast('Price must be a number (or leave blank for "Price on request").'); return; }
 
   setSaving(true);
   try {
@@ -380,7 +382,6 @@ async function saveItem() {
       bag.category = category;
       bag.description = desc;
       bag.price = price;
-      bag.branch = branch || undefined;
       bag.stock = { ...bag.stock, ...stock };
       // On edit, additional images = whatever is currently in stagedExtras (which we pre-populated from the bag)
       bag.images = extraUrls.length ? [imagePath || bag.image, ...extraUrls] : (imagePath ? [imagePath] : (bag.images || []));
@@ -402,7 +403,6 @@ async function saveItem() {
       const newBag = { id, name, category, description: desc, price, stock, sales: [], image: imagePath, createdAt: new Date().toISOString() };
       if (extraUrls.length) newBag.images = [imagePath, ...extraUrls];
       if (stagedInstagramUrl) newBag.instagramUrl = stagedInstagramUrl;
-      if (branch) newBag.branch = branch;
       bags.unshift(newBag);
       await apiPublish();
       showToast('Item added and live!');
@@ -426,8 +426,6 @@ function resetForm() {
   document.getElementById('categoryInput').value = '';
   document.getElementById('descInput').value = '';
   document.getElementById('priceInput').value = '';
-  const br = document.getElementById('branchInput');
-  if (br) br.value = '';
   clearStockForm();
   imageInput.value = '';
   imagePreview.innerHTML = '';
@@ -441,6 +439,11 @@ function resetForm() {
   if (igStatus) { igStatus.textContent = ''; igStatus.className = 'ig-quick-status'; }
   document.getElementById('formTitle').textContent = 'Add a new item';
   document.getElementById('cancelBtn').style.display = 'none';
+  // Restore the IG quick-add panel + divider (hidden during edit mode)
+  const igPanel = document.getElementById('igQuickPanel');
+  const manualDivider = document.getElementById('manualEntryDivider');
+  if (igPanel) igPanel.style.display = '';
+  if (manualDivider) manualDivider.style.display = '';
 }
 
 function editItem(id) {
@@ -452,8 +455,6 @@ function editItem(id) {
   document.getElementById('categoryInput').value = bag.category || '';
   document.getElementById('descInput').value = bag.description || '';
   document.getElementById('priceInput').value = bag.price;
-  const br = document.getElementById('branchInput');
-  if (br) br.value = bag.branch || '';
   setStockToForm(bag.stock || {});
   stagedImage = null;
   imagePreview.innerHTML = `<img src="${bag.image}" style="max-width:180px;border-radius:8px;">`;
@@ -462,7 +463,16 @@ function editItem(id) {
   renderExtraImagesPreview();
   document.getElementById('formTitle').textContent = 'Edit item';
   document.getElementById('cancelBtn').style.display = 'inline-block';
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  // Hide the IG quick-add panel + "OR enter manually" divider in edit mode —
+  // they're irrelevant when editing and they push the populated inputs off-screen
+  // on mobile, making it look like the Edit didn't work.
+  const igPanel = document.getElementById('igQuickPanel');
+  const manualDivider = document.getElementById('manualEntryDivider');
+  if (igPanel) igPanel.style.display = 'none';
+  if (manualDivider) manualDivider.style.display = 'none';
+  // Scroll the form into view (instant — smooth-scroll over a long page adds a
+  // confusing pause). Use the form title element so the "Edit item" h2 is at the top.
+  document.getElementById('formTitle').scrollIntoView({ behavior: 'auto', block: 'start' });
 }
 
 async function deleteItem(id) {
@@ -1167,6 +1177,136 @@ adminItemSearchInput?.addEventListener('input', () => {
     renderList();
   }, 160);
 });
+
+// ====== INSTAGRAM BULK SYNC ======
+// Mandatory companion to the per-post IG quick-add — owner clicks "Check for
+// new posts", reviews AI-classified previews, then commits the approved
+// subset. Dedupe is server-side by `ig_<shortcode>` so the button is
+// idempotent and never re-adds an item already in the catalog.
+const IG_USER_ID = '47659611317';
+const MENSWEAR_CATEGORIES = ['Tshirts', 'Shirts', 'Polos', 'Jeans', 'Shorts', 'Joggers', 'Tracksuits', 'Hoodies', 'Jackets', 'Suits', 'Shoes', 'Sneakers', 'Boots', 'Caps'];
+
+let igSyncCandidates = [];
+
+const igSyncCheckBtn = document.getElementById('igSyncCheckBtn');
+const igSyncCommitBtn = document.getElementById('igSyncCommitBtn');
+const igSyncCancelBtn = document.getElementById('igSyncCancelBtn');
+const igSyncStatus = document.getElementById('igSyncStatus');
+const igSyncListEl = document.getElementById('igSyncList');
+const igSyncCommitRow = document.getElementById('igSyncCommitRow');
+
+igSyncCheckBtn?.addEventListener('click', checkForNewIgPosts);
+igSyncCancelBtn?.addEventListener('click', resetIgSync);
+igSyncCommitBtn?.addEventListener('click', commitIgSync);
+
+async function checkForNewIgPosts() {
+  igSyncCheckBtn.disabled = true;
+  igSyncStatus.textContent = 'Checking Instagram…';
+  igSyncListEl.innerHTML = '';
+  igSyncCommitRow.style.display = 'none';
+  try {
+    const res = await fetch(`${API_BASE}/api/ig-discover?user_id=${IG_USER_ID}&limit=20`, {
+      headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+    igSyncCandidates = data.items || [];
+    if (!igSyncCandidates.length) {
+      igSyncStatus.textContent = '✓ Catalog is up to date. No new posts on Instagram.';
+      igSyncCheckBtn.disabled = false;
+      return;
+    }
+    igSyncStatus.textContent = `Found ${igSyncCandidates.length} new post${igSyncCandidates.length === 1 ? '' : 's'}. Review below, then add.`;
+    renderIgSyncList();
+    igSyncCommitRow.style.display = 'flex';
+  } catch (err) {
+    igSyncStatus.textContent = '✗ ' + err.message;
+  } finally {
+    igSyncCheckBtn.disabled = false;
+  }
+}
+
+function renderIgSyncList() {
+  igSyncListEl.innerHTML = igSyncCandidates.map((it, i) => {
+    const s = it.suggested || {};
+    // Ryker is NEW-STOCK: stock is { "M":1, "L":1, "XL":1 } etc. Show every
+    // detected size as a comma-list so the owner sees the full SKU array at
+    // a glance ("M, L, XL" not "M×1 · L×1 · XL×1" — too noisy when most are 1).
+    const stockKeys = Object.keys(s.stock || {});
+    const stockText = stockKeys.length ? stockKeys.join(', ') : 'One Size';
+    const captionShort = (it.caption || '').replace(/\s+/g, ' ').slice(0, 120);
+    const catOpts = MENSWEAR_CATEGORIES.map(c => `<option value="${c}" ${c === s.category ? 'selected' : ''}>${c}</option>`).join('');
+    return `
+      <div class="ig-sync-row" data-idx="${i}">
+        <label class="ig-sync-check">
+          <input type="checkbox" data-ig-pick="${i}" checked>
+        </label>
+        <img src="${escapeHtml(it.imageUrl)}" alt="" referrerpolicy="no-referrer">
+        <div class="ig-sync-body">
+          <div class="ig-sync-row-1">
+            <input type="text" class="ig-sync-name" data-ig-name="${i}" value="${escapeHtml(s.name || '')}" placeholder="Name">
+            <select class="ig-sync-cat" data-ig-cat="${i}">${catOpts}</select>
+          </div>
+          <div class="ig-sync-row-2">
+            <span class="ig-sync-size">${escapeHtml(stockText)}</span>
+            <a href="${escapeHtml(it.postUrl)}" target="_blank" rel="noopener" class="ig-sync-postlink">view on IG ↗</a>
+          </div>
+          <div class="ig-sync-caption">${escapeHtml(captionShort)}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function resetIgSync() {
+  igSyncCandidates = [];
+  igSyncListEl.innerHTML = '';
+  igSyncCommitRow.style.display = 'none';
+  igSyncStatus.textContent = '';
+}
+
+async function commitIgSync() {
+  const picks = [];
+  igSyncCandidates.forEach((it, i) => {
+    const cb = igSyncListEl.querySelector(`[data-ig-pick="${i}"]`);
+    if (!cb || !cb.checked) return;
+    const nameEl = igSyncListEl.querySelector(`[data-ig-name="${i}"]`);
+    const catEl = igSyncListEl.querySelector(`[data-ig-cat="${i}"]`);
+    picks.push({
+      shortcode: it.shortcode,
+      name: (nameEl?.value || it.suggested?.name || '').trim() || 'New Item',
+      category: catEl?.value || it.suggested?.category || 'Shirts',
+      stock: it.suggested?.stock || { 'One Size': 1 },
+      description: it.suggested?.description || '',
+      imageUrls: it.imageUrls || [it.imageUrl],
+      takenAt: it.takenAt,
+    });
+  });
+  if (!picks.length) { showToast('Tick at least one item to add.'); return; }
+  igSyncCommitBtn.disabled = true;
+  igSyncCommitBtn.textContent = `Adding ${picks.length}…`;
+  try {
+    const res = await fetch(`${API_BASE}/api/ig-sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ADMIN_TOKEN}` },
+      body: JSON.stringify({ items: picks }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+    showToast(`Added ${data.added} item${data.added === 1 ? '' : 's'} from Instagram.`);
+    igSyncStatus.textContent = `✓ Added ${data.added}. ${data.errors?.length ? `(${data.errors.length} failures)` : ''}`;
+    resetIgSync();
+    await loadData();
+    renderList();
+    renderDashboard();
+    renderInventory();
+  } catch (err) {
+    showToast('Error: ' + err.message);
+    igSyncStatus.textContent = '✗ ' + err.message;
+  } finally {
+    igSyncCommitBtn.disabled = false;
+    igSyncCommitBtn.textContent = 'Add selected items';
+  }
+}
 
 async function init() {
   showToast('Loading…');
