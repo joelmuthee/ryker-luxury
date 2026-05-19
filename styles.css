@@ -185,17 +185,31 @@ img { max-width: 100%; display: block; }
   font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,0.18);
   border: 1px solid #ffd6d6;
 }
+/* Heart pill — heart icon + fake-social-proof counter (deterministic base
+   per item id, +1 when visitor wishlists). Sits bottom-right of card image. */
 .heart-btn {
   position: absolute; bottom: 12px; right: 12px;
-  width: 36px; height: 36px; border-radius: 50%;
-  background: rgba(255,255,255,0.92); border: none;
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
-  color: var(--ink-soft); transition: 0.15s;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 10px 6px 9px;
+  background: rgba(255,255,255,0.92);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  transition: background 0.18s, color 0.18s, transform 0.18s;
   box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
-.heart-btn:hover { transform: scale(1.08); color: #e63946; }
-.heart-btn.saved { color: #e63946; background: #fff; }
-.heart-btn.saved:hover { color: var(--ink-soft); }
+.heart-btn:hover { color: #e63946; transform: translateY(-1px); }
+.heart-btn .heart-count { font-variant-numeric: tabular-nums; }
+.heart-btn.saved { color: #fff; background: rgba(230,57,70,0.92); }
+.heart-btn.saved:hover { background: rgba(200,40,55,0.95); color: #fff; }
+.heart-btn.saved svg { fill: #fff; }
 
 /* Size guide link on cards */
 .size-guide-link {
@@ -910,7 +924,7 @@ html { scroll-behavior: smooth; }
   .filters { padding: 40px 0 16px; }
   .section-title { font-size: clamp(32px, 9vw, 44px); }
   /* Filter pills wrap to multiple rows on mobile (no horizontal scroll) */
-  .filter-pills--cats, .filter-pills--sizes, .filter-pills--branches {
+  .filter-pills--cats, .filter-pills--sizes {
     flex-wrap: wrap;
     gap: 6px;
   }

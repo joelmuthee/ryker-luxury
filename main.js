@@ -16,7 +16,6 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
   let currentAvail = 'all';
   let currentCat = 'all';
   let currentSize = 'all';
-  let currentBranch = 'all';
   let currentSort = 'default';
   let currentSearch = '';
   let currentPage = 1;
@@ -56,6 +55,18 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     const btn = document.getElementById('wishlistBtn');
     if (btn) btn.querySelector('.wl-count').textContent = wishlist.size || '';
     btn?.classList.toggle('has-items', wishlist.size > 0);
+  }
+
+  // Per-item deterministic base count (7..20) + 1 if the visitor wishlisted it.
+  // Social-proof signal without inventing fake activity. Same pattern as
+  // ThriftLux. Hash on item.id so the number stays stable across reloads.
+  function itemBaseLikes(id) {
+    let h = 0;
+    for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
+    return 7 + Math.abs(h) % 14;
+  }
+  function itemLikeCount(id) {
+    return itemBaseLikes(id) + (wishlist.has(id) ? 1 : 0);
   }
 
   function isNew(item) {
@@ -127,9 +138,13 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
       else if (avail.length === 1) sizePart = ` (size ${avail[0]})`;
       // multi-size with nothing selected → no size in URL; click handler should block before reaching here
     }
-    const msg = soldOut
+    const pricePart = item.price > 0 ? ` (${fmtPrice(item.price)})` : '';
+    const body = soldOut
       ? `Hi Ryker! I saw *${item.name}* is sold out. Will it be back in stock? I'd love to reserve one.`
-      : `Hi Ryker! I'd like to enquire about *${item.name}*${sizePart} (${fmtPrice(item.price)}) from your catalog.`;
+      : `Hi Ryker! I'd like to enquire about *${item.name}*${sizePart}${pricePart} from your catalog.`;
+    // Append the item's image URL so WhatsApp fetches it and shows a preview thumbnail of the product.
+    const imgUrl = item.image || (item.images && item.images[0]) || '';
+    const msg = imgUrl ? `${body}\n\n${imgUrl}` : body;
     return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   }
 
@@ -173,27 +188,6 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     const all = new Set();
     pool.forEach(i => availSizes(i).forEach(s => all.add(s)));
     return [...all].sort(sortSize);
-  }
-
-  function buildBranchPills() {
-    const branchPills = document.getElementById('branchPills');
-    if (!branchPills) return;
-    const branches = [...new Set(items.map(i => i.branch).filter(Boolean))].sort();
-    if (branches.length < 2) { branchPills.innerHTML = ''; branchPills.style.display = 'none'; return; }
-    branchPills.style.display = '';
-    branchPills.innerHTML = [
-      `<button class="pill pill--branch ${currentBranch === 'all' ? 'active' : ''}" data-branch="all">All branches</button>`,
-      ...branches.map(b => `<button class="pill pill--branch ${currentBranch === b ? 'active' : ''}" data-branch="${escapeHtml(b)}">📍 ${escapeHtml(b)}</button>`)
-    ].join('');
-    branchPills.querySelectorAll('.pill--branch').forEach(p => {
-      p.addEventListener('click', () => {
-        branchPills.querySelectorAll('.pill--branch').forEach(x => x.classList.remove('active'));
-        p.classList.add('active');
-        currentBranch = p.dataset.branch;
-        currentPage = 1;
-        render();
-      });
-    });
   }
 
   function buildCatPills() {
@@ -252,7 +246,6 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
   const IG_SVG = `<svg class="ig-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>`;
 
   function render() {
-    buildBranchPills();
     buildCatPills();
     buildSizePills();
 
@@ -268,8 +261,7 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
       const soldOut = isSoldOut(item);
       const availOk = currentAvail === 'all' || (currentAvail === 'sold' ? soldOut : !soldOut);
       const catOk = currentCat === 'all' || item.category === currentCat;
-      const branchOk = currentBranch === 'all' || (item.branch || '') === currentBranch || !item.branch;
-      return availOk && catOk && branchOk && sizeMatch(item) && searchMatch(item);
+      return availOk && catOk && sizeMatch(item) && searchMatch(item);
     });
 
     // Sort
@@ -321,7 +313,8 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
           ${lowStock ? `<span class="badge-low">Only ${totalUnits} left</span>` : ''}
           ${catBadge}
           <button class="heart-btn ${saved ? 'saved' : ''}" data-wishlist="${escapeHtml(item.id)}" aria-label="${saved ? 'Remove from saved' : 'Save item'}" title="${saved ? 'Saved' : 'Save for later'}">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="${saved ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="${saved ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            <span class="heart-count">${itemLikeCount(item.id)}</span>
           </button>
         </div>
         <div class="card-body">
