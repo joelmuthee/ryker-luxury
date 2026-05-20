@@ -72,6 +72,31 @@ async function loadData() {
 const toast = document.getElementById('toast');
 function showToast(msg) { toast.textContent = msg; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2800); }
 
+// In-page confirm. Native confirm() returns false without showing in in-app
+// webviews (WhatsApp/Instagram browser) and after Chrome's "block additional
+// dialogs", which silently aborted deletes for the owner.
+function confirmAction(message, okLabel = 'Confirm') {
+  return new Promise(resolve => {
+    const modal = document.getElementById('confirmModal');
+    const msgEl = document.getElementById('confirmModalMsg');
+    const okBtn = document.getElementById('confirmModalOk');
+    const cancelBtn = document.getElementById('confirmModalCancel');
+    msgEl.textContent = message;
+    okBtn.textContent = okLabel;
+    modal.style.display = 'flex';
+    const cleanup = result => {
+      modal.style.display = 'none';
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      resolve(result);
+    };
+    const onOk = () => cleanup(true);
+    const onCancel = () => cleanup(false);
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+  });
+}
+
 function setSaving(on) {
   const btn = document.getElementById('saveBtn');
   btn.disabled = on;
@@ -476,7 +501,7 @@ function editItem(id) {
 }
 
 async function deleteItem(id) {
-  if (!confirm('Delete this item? This cannot be undone.')) return;
+  if (!await confirmAction('Delete this item? This cannot be undone.', 'Delete')) return;
   bags = bags.filter(b => b.id !== id);
   try {
     await apiPublish();
@@ -898,7 +923,7 @@ function bulkSelectAll() {
 }
 
 async function bulkDelete() {
-  if (!confirm(`Delete ${bulkSelected.size} item(s)? This cannot be undone.`)) return;
+  if (!await confirmAction(`Delete ${bulkSelected.size} item(s)? This cannot be undone.`, 'Delete')) return;
   bags = bags.filter(b => !bulkSelected.has(b.id));
   bulkSelected.clear();
   try {
