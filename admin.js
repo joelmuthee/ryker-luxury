@@ -97,6 +97,43 @@ function confirmAction(message, okLabel = 'Confirm') {
   });
 }
 
+// In-page category picker. Same reason as confirmAction — native prompt() is
+// suppressed in in-app webviews. Lists existing categories (avoids typos) with
+// a "+ New category…" escape hatch. Resolves to the chosen name, or null.
+function chooseCategory() {
+  return new Promise(resolve => {
+    const modal = document.getElementById('categoryModal');
+    const sel = document.getElementById('categoryModalSelect');
+    const newWrap = document.getElementById('categoryModalNewWrap');
+    const newInput = document.getElementById('categoryModalNew');
+    const okBtn = document.getElementById('categoryModalOk');
+    const cancelBtn = document.getElementById('categoryModalCancel');
+    const cats = [...new Set(bags.map(b => b.category).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    sel.innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')
+      + '<option value="__new__">+ New category…</option>';
+    newWrap.style.display = 'none';
+    newInput.value = '';
+    modal.style.display = 'flex';
+    const onSelChange = () => {
+      const isNew = sel.value === '__new__';
+      newWrap.style.display = isNew ? '' : 'none';
+      if (isNew) newInput.focus();
+    };
+    const cleanup = result => {
+      modal.style.display = 'none';
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      sel.removeEventListener('change', onSelChange);
+      resolve(result);
+    };
+    const onOk = () => cleanup((sel.value === '__new__' ? newInput.value.trim() : sel.value) || null);
+    const onCancel = () => cleanup(null);
+    sel.addEventListener('change', onSelChange);
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+  });
+}
+
 function setSaving(on) {
   const btn = document.getElementById('saveBtn');
   btn.disabled = on;
@@ -946,16 +983,16 @@ async function bulkDelete() {
 }
 
 async function bulkSetCategory() {
-  const cat = prompt('Set category for selected items to:\n(use exact name e.g. Polos, Shirts, Jeans, Caps)');
+  const cat = await chooseCategory();
   if (!cat) return;
+  const n = bulkSelected.size;
   bags.forEach(b => { if (bulkSelected.has(b.id)) b.category = cat; });
   try {
     await apiPublish();
-    renderList();
-    renderInventory();
-    showToast(`Set ${bulkSelected.size} item(s) to "${cat}".`);
     bulkSelected.clear();
     renderList();
+    renderInventory();
+    showToast(`Set ${n} item(s) to "${cat}".`);
   } catch (err) {
     showToast('Sync failed: ' + err.message);
   }

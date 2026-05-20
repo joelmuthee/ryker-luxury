@@ -431,6 +431,26 @@
   </div>
 </div>
 
+<!-- CATEGORY MODAL (replaces native prompt() — suppressed in in-app webviews) -->
+<div id="categoryModal" class="modal" style="display:none;">
+  <div class="modal-card">
+    <h3>Set category</h3>
+    <p class="sub">Move the selected items to this category.</p>
+    <div class="field">
+      <label>Category</label>
+      <select id="categoryModalSelect"></select>
+    </div>
+    <div class="field" id="categoryModalNewWrap" style="display:none;">
+      <label>New category name</label>
+      <input id="categoryModalNew" type="text" placeholder="e.g. Blazers">
+    </div>
+    <div class="admin-actions" style="margin-top:18px;">
+      <button class="btn-admin gold" id="categoryModalOk">Apply</button>
+      <button class="btn-admin" id="categoryModalCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- CONFIRM MODAL (replaces native confirm() — suppressed in in-app webviews) -->
 <div id="confirmModal" class="modal" style="display:none;">
   <div class="modal-card">
@@ -443,6 +463,6 @@
   </div>
 </div>
 
-<script src="admin.js?v=19"></script>
+<script src="admin.js?v=20"></script>
 </body>
 </html>
