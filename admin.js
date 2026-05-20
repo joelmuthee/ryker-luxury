@@ -1257,10 +1257,10 @@ document.getElementById('broadcastCopyBtn')?.addEventListener('click', () => {
   showToast('Message copied — paste it into your WhatsApp broadcast.');
 });
 
-document.getElementById('broadcastStartBtn')?.addEventListener('click', () => {
+document.getElementById('broadcastStartBtn')?.addEventListener('click', async () => {
   const recipients = pastBuyers().filter(b => broadcastRecipientsState[b.phone]?.included);
   if (!recipients.length) { showToast('Pick at least one recipient.'); return; }
-  if (!confirm(`Open ${recipients.length} WhatsApp window${recipients.length === 1 ? '' : 's'}, one per buyer. Send each one manually. OK?`)) return;
+  if (!await confirmAction(`Open ${recipients.length} WhatsApp window${recipients.length === 1 ? '' : 's'}, one per buyer. Send each one manually. OK?`)) return;
   let i = 0;
   function next() {
     if (i >= recipients.length) {
@@ -1329,8 +1329,8 @@ function renderInsights() {
     : '<p style="color:#999;font-size:13px;">No empty searches yet — shoppers find what they look for.</p>';
 }
 
-document.getElementById('insightsResetBtn')?.addEventListener('click', () => {
-  if (!confirm('Reset all insights on this device? This only affects this browser.')) return;
+document.getElementById('insightsResetBtn')?.addEventListener('click', async () => {
+  if (!await confirmAction('Reset all insights on this device? This only affects this browser.')) return;
   localStorage.removeItem(INSIGHTS_KEY);
   renderInsights();
   showToast('Insights reset on this device.');
