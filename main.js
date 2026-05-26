@@ -131,7 +131,6 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     return hasSales;
   }
 
-  function enquireImg(item) { return item.image || (item.images && item.images[0]) || ''; }
 
   function enquireBody(item, soldOut, selectedSize) {
     const avail = availSizes(item);
@@ -150,9 +149,10 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
   function whatsappLink(item, soldOut, selectedSize) {
     const phone = settings.whatsappNumber || '254714672436';
     const body = enquireBody(item, soldOut, selectedSize);
-    // Append the item's image URL so WhatsApp's link preview can show a thumbnail (Tier 2 fallback).
-    const imgUrl = enquireImg(item);
-    const msg = imgUrl ? `${body}\n\n${imgUrl}` : body;
+    // Append the item's /p/<id> share page — WhatsApp previews it as a card with the
+    // product photo + name + price. Still opens straight to WhatsApp (no app picker).
+    const shareUrl = item.id ? `${API_BASE}/p/${encodeURIComponent(item.id)}` : '';
+    const msg = shareUrl ? `${body}\n\n${shareUrl}` : body;
     return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   }
 
