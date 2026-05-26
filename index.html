@@ -32,7 +32,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=31">
+<link rel="stylesheet" href="styles.css?v=32">
 <!-- GHL external tracking -->
 <script src="https://link.essenceautomations.com/js/external-tracking.js" data-tracking-id="tk_d5a5c7952dc94771ba91855a4bfe3aea"></script>
 </head>
@@ -142,16 +142,56 @@
 </section>
 
 <footer class="footer" id="contact">
-  <div class="container footer-inner">
-    <div class="footer-brand fade-up">
-      <img src="images/logo-nav.jpg" alt="Ryker Luxury Stores" class="brand-logo">
+  <div class="container footer-grid">
+
+    <div class="footer-col footer-brand fade-up">
+      <div class="footer-logo-plate"><img src="images/logo-nav.jpg" alt="Ryker Luxury Stores"></div>
+      <p class="footer-tagline">Premium Menswear · Nairobi</p>
+      <p class="footer-blurb">Hand-selected menswear, footwear and accessories. New arrivals every week, photographed exactly as they are.</p>
+      <div class="footer-pay">
+        <span class="footer-pay-label">We accept</span>
+        <span class="pay-pill">M-Pesa</span>
+        <span class="pay-pill">Cash on pickup</span>
+      </div>
     </div>
-    <div class="footer-links fade-up">
-      <span class="footer-shop">Legend Valley Business Park · Gitanga Road · Nairobi</span>
-      <a href="https://wa.me/254714672436" target="_blank" rel="noopener">WhatsApp · 0714 672 436</a>
-      <a href="https://www.instagram.com/rykerluxury/" target="_blank" rel="noopener">Instagram · @rykerluxury</a>
+
+    <div class="footer-col fade-up">
+      <h4 class="footer-h">Visit the shop</h4>
+      <address class="footer-address">Legend Valley Business Park<br>Gitanga Road<br>Nairobi, Kenya</address>
+      <a class="footer-directions" href="https://www.google.com/maps/search/?api=1&query=Legend%20Valley%20Business%20Park%2C%20Gitanga%20Road%2C%20Nairobi" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z"/></svg>
+        Get directions
+      </a>
     </div>
-    <p class="footer-fine">© <span id="year"></span> Ryker Luxury · Nairobi · <a href="https://essenceautomations.com/websites" target="_blank" rel="noopener" class="footer-credit">Designed by Essence Automations</a></p>
+
+    <div class="footer-col fade-up">
+      <h4 class="footer-h">Shop</h4>
+      <ul class="footer-nav">
+        <li><a href="#shop">The Collection</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#how">How to buy</a></li>
+      </ul>
+    </div>
+
+    <div class="footer-col fade-up">
+      <h4 class="footer-h">Connect</h4>
+      <div class="footer-socials">
+        <a class="social-card" href="https://wa.me/254714672436" target="_blank" rel="noopener">
+          <span class="social-ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.6 6.32A7.85 7.85 0 0 0 12 4a7.94 7.94 0 0 0-6.9 11.9L4 20l4.2-1.1A7.9 7.9 0 0 0 12 19.88a7.94 7.94 0 0 0 5.6-13.56ZM12 18.54a6.6 6.6 0 0 1-3.36-.92l-.24-.14-2.49.65.66-2.43-.16-.25A6.6 6.6 0 1 1 12 18.54Zm3.62-4.94c-.2-.1-1.17-.58-1.35-.64s-.31-.1-.44.1-.5.64-.62.77-.23.15-.43.05a5.4 5.4 0 0 1-1.6-1 6 6 0 0 1-1.1-1.37c-.11-.2 0-.3.09-.4s.2-.24.3-.36a1.36 1.36 0 0 0 .2-.33.37.37 0 0 0 0-.35c0-.1-.44-1.06-.6-1.45s-.32-.33-.44-.33h-.38a.72.72 0 0 0-.52.24 2.18 2.18 0 0 0-.68 1.62 3.8 3.8 0 0 0 .8 2 8.7 8.7 0 0 0 3.33 2.94c.47.2.83.32 1.11.42a2.67 2.67 0 0 0 1.23.07 2 2 0 0 0 1.31-.92 1.62 1.62 0 0 0 .11-.92c-.05-.09-.18-.14-.38-.24Z"/></svg></span>
+          <span class="social-txt"><strong>WhatsApp</strong><span>0714 672 436</span></span>
+        </a>
+        <a class="social-card" href="https://www.instagram.com/rykerluxury/" target="_blank" rel="noopener">
+          <span class="social-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.2" fill="currentColor" stroke="none"/></svg></span>
+          <span class="social-txt"><strong>Instagram</strong><span>@rykerluxury</span></span>
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="container footer-bottom">
+    <p>© <span id="year"></span> Ryker Luxury Stores · Nairobi</p>
+    <p>Designed by <a href="https://essenceautomations.com/websites" target="_blank" rel="noopener" class="footer-credit">Essence Automations</a></p>
   </div>
 </footer>
 
