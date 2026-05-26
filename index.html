@@ -3,6 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+  /* Domain migration: bounce the retired subdomain to rykerluxury.co.ke.
+     Dormant on the live domain + pages.dev; only fires on the old host. */
+  (function () {
+    if (location.hostname === 'rykerluxury.essenceautomations.com') {
+      location.replace('https://rykerluxury.co.ke' + location.pathname + location.search + location.hash);
+    }
+  })();
+</script>
 <title>Ryker Luxury · Premium Menswear, Nairobi</title>
 <meta name="description" content="Premium menswear in Nairobi. Shirts, polos, jeans, shoes and more. New drops every week, quality guaranteed. Visit Ryker Luxury at Legend Valley Business Park, Gitanga Road.">
 
