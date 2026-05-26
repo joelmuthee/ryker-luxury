@@ -156,30 +156,6 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   }
 
-  // Tier 1 (mobile): share the actual product photo through the native share sheet so it
-  // arrives in WhatsApp as a real image attachment, not just a link that may not preview.
-  // Returns true if shared; false to fall back to the wa.me link.
-  async function tryShareWithImage(item, soldOut, selectedSize) {
-    if (!navigator.canShare || !navigator.share) return false;
-    const imgUrl = enquireImg(item);
-    if (!imgUrl) return false;
-    try {
-      const res = await fetch(imgUrl, { mode: 'cors' });
-      if (!res.ok) return false;
-      const blob = await res.blob();
-      const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
-      const file = new File([blob], `${item.name.replace(/[^a-z0-9]+/gi, '_')}.${ext}`, { type: blob.type });
-      if (!navigator.canShare({ files: [file] })) return false;
-      const message = enquireBody(item, soldOut, selectedSize);
-      try { await navigator.clipboard.writeText(message); } catch (_) { /* ignore */ }
-      await navigator.share({ files: [file], text: message, title: item.name });
-      return true;
-    } catch (_) {
-      // user cancelled or share failed — caller falls back to wa.me
-      return false;
-    }
-  }
-
   function showToast(msg) {
     let toast = document.getElementById('publicToast');
     if (!toast) {
@@ -545,14 +521,8 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
         enquire.href = whatsappLink(item, false, selected.dataset.size);
       }
       track('itemEnquiries', id);
-      // Tier 1: on mobile, push the real photo via the native share sheet; fall back to wa.me.
-      const isMobile = matchMedia('(pointer: coarse)').matches || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-      if (isMobile && navigator.canShare) {
-        e.preventDefault();
-        const selEl = card.querySelector('.size-chip.selected');
-        const shared = await tryShareWithImage(item, soldOut, selEl ? selEl.dataset.size : undefined);
-        if (!shared) window.open(enquire.href, '_blank', 'noopener');
-      }
+      // Enquire opens WhatsApp directly via the wa.me href (anchor, target=_blank).
+      // No native share sheet — the OS "select an app" chooser confused buyers.
     }
     const igClick = e.target.closest('.btn-card.ig');
     if (igClick) {
