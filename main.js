@@ -129,23 +129,53 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     return hasSales;
   }
 
-  function whatsappLink(item, soldOut, selectedSize) {
-    const phone = settings.whatsappNumber || '254714672436';
+  function enquireImg(item) { return item.image || (item.images && item.images[0]) || ''; }
+
+  function enquireBody(item, soldOut, selectedSize) {
     const avail = availSizes(item);
     let sizePart = '';
     if (!soldOut) {
       if (selectedSize) sizePart = ` (size ${selectedSize})`;
       else if (avail.length === 1) sizePart = ` (size ${avail[0]})`;
-      // multi-size with nothing selected → no size in URL; click handler should block before reaching here
+      // multi-size with nothing selected → no size in body; click handler blocks before reaching here
     }
     const pricePart = item.price > 0 ? ` (${fmtPrice(item.price)})` : '';
-    const body = soldOut
+    return soldOut
       ? `Hi Ryker! I saw *${item.name}* is sold out. Will it be back in stock? I'd love to reserve one.`
       : `Hi Ryker! I'd like to enquire about *${item.name}*${sizePart}${pricePart} from your catalog.`;
-    // Append the item's image URL so WhatsApp fetches it and shows a preview thumbnail of the product.
-    const imgUrl = item.image || (item.images && item.images[0]) || '';
+  }
+
+  function whatsappLink(item, soldOut, selectedSize) {
+    const phone = settings.whatsappNumber || '254714672436';
+    const body = enquireBody(item, soldOut, selectedSize);
+    // Append the item's image URL so WhatsApp's link preview can show a thumbnail (Tier 2 fallback).
+    const imgUrl = enquireImg(item);
     const msg = imgUrl ? `${body}\n\n${imgUrl}` : body;
     return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+  }
+
+  // Tier 1 (mobile): share the actual product photo through the native share sheet so it
+  // arrives in WhatsApp as a real image attachment, not just a link that may not preview.
+  // Returns true if shared; false to fall back to the wa.me link.
+  async function tryShareWithImage(item, soldOut, selectedSize) {
+    if (!navigator.canShare || !navigator.share) return false;
+    const imgUrl = enquireImg(item);
+    if (!imgUrl) return false;
+    try {
+      const res = await fetch(imgUrl, { mode: 'cors' });
+      if (!res.ok) return false;
+      const blob = await res.blob();
+      const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+      const file = new File([blob], `${item.name.replace(/[^a-z0-9]+/gi, '_')}.${ext}`, { type: blob.type });
+      if (!navigator.canShare({ files: [file] })) return false;
+      const message = enquireBody(item, soldOut, selectedSize);
+      try { await navigator.clipboard.writeText(message); } catch (_) { /* ignore */ }
+      await navigator.share({ files: [file], text: message, title: item.name });
+      return true;
+    } catch (_) {
+      // user cancelled or share failed — caller falls back to wa.me
+      return false;
+    }
   }
 
   function showToast(msg) {
@@ -461,7 +491,7 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     wrap.querySelectorAll('.carousel-dot').forEach((d, i) => d.classList.toggle('active', i === cur));
   }
 
-  gallery.addEventListener('click', e => {
+  gallery.addEventListener('click', async e => {
     // Wishlist toggle
     const heart = e.target.closest('[data-wishlist]');
     if (heart) {
@@ -513,6 +543,14 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
         enquire.href = whatsappLink(item, false, selected.dataset.size);
       }
       track('itemEnquiries', id);
+      // Tier 1: on mobile, push the real photo via the native share sheet; fall back to wa.me.
+      const isMobile = matchMedia('(pointer: coarse)').matches || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+      if (isMobile && navigator.canShare) {
+        e.preventDefault();
+        const selEl = card.querySelector('.size-chip.selected');
+        const shared = await tryShareWithImage(item, soldOut, selEl ? selEl.dataset.size : undefined);
+        if (!shared) window.open(enquire.href, '_blank', 'noopener');
+      }
     }
     const igClick = e.target.closest('.btn-card.ig');
     if (igClick) {
