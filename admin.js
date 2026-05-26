@@ -594,7 +594,8 @@ function openSaleModal(id) {
 
 function closeSaleModal() { saleModal.style.display = 'none'; pendingSaleId = null; }
 
-document.getElementById('saleSaveBtn').addEventListener('click', async () => {
+// withBuyer=false → record the sale and mark sold without capturing any buyer details (no GHL).
+async function recordSale(withBuyer) {
   const bag = bags.find(b => b.id === pendingSaleId);
   if (!bag) return;
   const size = saleSizeInput.value;
@@ -608,15 +609,16 @@ document.getElementById('saleSaveBtn').addEventListener('click', async () => {
 
   // Record sale
   if (!bag.sales) bag.sales = [];
-  bag.sales.push({
+  const sale = {
     size,
     qty,
     salePrice,
-    buyerName: buyerName.value.trim(),
-    buyerPhone: buyerPhone.value.trim(),
-    notes: buyerNotes.value.trim(),
+    buyerName: withBuyer ? buyerName.value.trim() : '',
+    buyerPhone: withBuyer ? buyerPhone.value.trim() : '',
+    notes: withBuyer ? buyerNotes.value.trim() : '',
     soldAt: new Date().toISOString(),
-  });
+  };
+  bag.sales.push(sale);
 
   closeSaleModal();
   try {
@@ -625,10 +627,12 @@ document.getElementById('saleSaveBtn').addEventListener('click', async () => {
     renderDashboard();
     renderInventory();
     showToast(`Sale recorded — ${qty}× ${size} sold.`);
-    if (buyerName.value.trim() || buyerPhone.value.trim()) sendBuyerToGHL(bag, bag.sales[bag.sales.length - 1]);
+    if (withBuyer && (sale.buyerName || sale.buyerPhone)) sendBuyerToGHL(bag, sale);
   } catch (err) { showToast('Error: ' + err.message); }
-});
+}
 
+document.getElementById('saleSaveBtn').addEventListener('click', () => recordSale(true));
+document.getElementById('saleSkipBtn').addEventListener('click', () => recordSale(false));
 document.getElementById('saleCancelBtn').addEventListener('click', closeSaleModal);
 saleModal.addEventListener('click', e => { if (e.target === saleModal) closeSaleModal(); });
 
