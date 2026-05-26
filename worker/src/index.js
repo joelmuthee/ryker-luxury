@@ -575,6 +575,44 @@ export default {
       });
     }
 
+    // Per-item share page for WhatsApp/social link previews. The catalog Enquire
+    // link ends with `${API_BASE}/p/<id>`; WhatsApp crawls this HTML, reads the OG
+    // tags, and renders a preview card with the product photo + name + price.
+    // A bare image URL doesn't preview reliably; an OG-tagged page always does.
+    if (request.method === "GET" && path.startsWith("/p/")) {
+      const SITE = "https://rykerluxury.co.ke";
+      const esc = (s) => String(s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+      const id = decodeURIComponent(path.slice(3));
+      const raw = await env.BAGS.get("data");
+      const bags = raw ? (JSON.parse(raw).bags || []) : [];
+      const item = bags.find(b => b.id === id);
+      if (!item) return Response.redirect(SITE + "/#shop", 302);
+      const img = item.image || (item.images && item.images[0]) || `${SITE}/images/og-image.jpg`;
+      const mime = /\.png$/i.test(img) ? "image/png" : /\.webp$/i.test(img) ? "image/webp" : "image/jpeg";
+      const price = item.price > 0 ? ` · Ksh ${Number(item.price).toLocaleString("en-US")}` : "";
+      const title = esc(item.name + price);
+      const desc = esc((item.description || "Premium menswear in Nairobi. Tap to view and enquire on WhatsApp.").slice(0, 160));
+      const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta property="og:type" content="product">
+<meta property="og:site_name" content="Ryker Luxury">
+<meta property="og:title" content="${title}">
+<meta property="og:description" content="${desc}">
+<meta property="og:image" content="${esc(img)}">
+<meta property="og:image:secure_url" content="${esc(img)}">
+<meta property="og:image:type" content="${mime}">
+<meta property="og:image:width" content="1080">
+<meta property="og:image:height" content="1080">
+<meta property="og:url" content="${SITE}/#shop">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${title}">
+<meta name="twitter:image" content="${esc(img)}">
+<title>${title} · Ryker Luxury</title>
+<meta http-equiv="refresh" content="0; url=${SITE}/#shop">
+</head><body style="font-family:system-ui;background:#0d0a07;color:#e8dcc4;text-align:center;padding:40px">Opening Ryker Luxury…</body></html>`;
+      return new Response(html, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8", ...CORS } });
+    }
+
     if (path === "/api/health") return json({ ok: true, time: new Date().toISOString() });
 
     // Buyer → GHL proxy
