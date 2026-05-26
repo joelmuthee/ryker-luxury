@@ -13,6 +13,7 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
   const WISHLIST_KEY = 'ryker_wishlist';
   let items = [];
   let settings = {};
+  let suspended = false;
   let currentAvail = 'all';
   let currentCat = 'all';
   let currentSize = 'all';
@@ -92,6 +93,7 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
       const json = await res.json();
       items = json.bags || [];
       settings = json.settings || {};
+      suspended = !!json.suspended;
     } catch (e) {
       try {
         const res = await fetch('data.json');
@@ -732,6 +734,20 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     document.querySelectorAll('.fade-up').forEach(el => el.classList.add('in-view'));
   }
 
+  // Billing kill-switch: when suspended, replace the whole page with a neutral
+  // "offline" notice instead of the catalog. Buyers never see a payment reason.
+  function showSuspended() {
+    document.documentElement.style.overflow = 'hidden';
+    const o = document.createElement('div');
+    o.id = 'suspendedOverlay';
+    o.style.cssText = 'position:fixed;inset:0;z-index:99999;background:linear-gradient(180deg,#2a1c0f,#0d0a07);color:#e8dcc4;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px;font-family:Inter,system-ui,sans-serif;';
+    o.innerHTML = '<img src="images/logo-nav.jpg" alt="Ryker Luxury" style="height:54px;background:#fff;border-radius:10px;padding:8px 12px;margin-bottom:28px;">'
+      + '<h1 style="font-family:\'Cormorant Garamond\',Georgia,serif;font-weight:500;font-size:clamp(28px,5vw,44px);color:#d4c0a0;margin:0 0 14px;line-height:1.15;">This store is temporarily offline</h1>'
+      + '<p style="font-size:16px;max-width:440px;line-height:1.6;color:rgba(216,210,196,0.8);margin:0;">We are not taking orders right now. Please check back soon.</p>';
+    document.body.appendChild(o);
+  }
+
   await loadData();
+  if (suspended) { showSuspended(); return; }
   render();
 })();

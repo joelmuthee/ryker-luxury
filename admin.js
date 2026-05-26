@@ -61,11 +61,27 @@ async function apiPublish() {
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Save failed: ${res.status}`); }
 }
 
+let accountSuspended = false;
 async function loadData() {
   const res = await fetch(`${API_BASE}/api/bags?_=${Date.now()}`);
   const json = await res.json();
   bags = json.bags || [];
   settings = json.settings || {};
+  accountSuspended = !!json.suspended;
+}
+
+// Owner-facing notice when billing has suspended the store. The public site is
+// dark; this tells the owner why and how to restore (they can't unflip it).
+function renderSuspendedBanner() {
+  let b = document.getElementById('suspendedBanner');
+  if (!accountSuspended) { if (b) b.remove(); return; }
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'suspendedBanner';
+    b.style.cssText = 'position:sticky;top:0;z-index:9000;background:#b00020;color:#fff;padding:12px 16px;text-align:center;font-size:14px;font-weight:600;line-height:1.4;';
+    document.body.prepend(b);
+  }
+  b.innerHTML = 'Your store is currently offline because payment is overdue. Please contact Essence Automations to restore it. <a href="https://wa.me/254720615606" style="color:#fff;text-decoration:underline;">Message us</a>';
 }
 
 // ====== HELPERS ======
@@ -1564,6 +1580,7 @@ async function commitIgSync() {
 async function init() {
   showToast('Loading…');
   await loadData();
+  renderSuspendedBanner();
   renderList();
   renderTrash();
   renderDashboard();
