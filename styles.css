@@ -185,6 +185,33 @@ img { max-width: 100%; display: block; }
   font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,0.18);
   border: 1px solid #ffd6d6;
 }
+/* ===== SALE / MARKDOWN ===== */
+/* On-Sale filter pill — red accent so it stands out from the gold filter row. */
+.pill-sale { border-color: rgba(192,57,43,0.5); color: #c0392b; }
+.pill-sale:hover { border-color: #c0392b; color: #fff; background: rgba(192,57,43,0.9); }
+.pill-sale.active { background: #c0392b; border-color: #c0392b; color: #fff; }
+/* SALE ribbon — red, top-left (matches the NEW badge corner; NEW is suppressed while on sale so they never stack). */
+.badge-sale {
+  position: absolute; top: 14px; left: 14px;
+  background: #c0392b; color: #fff;
+  font-size: 10px; letter-spacing: 0.2em; padding: 4px 10px; border-radius: 4px;
+  font-weight: 800; text-transform: uppercase;
+  box-shadow: 0 4px 14px rgba(192,57,43,0.45);
+}
+/* Card sale pricing: original struck-through, sale price in red, a -X% pill. */
+.card-price-was {
+  font-family: var(--serif); font-size: 17px; font-weight: 500;
+  color: var(--ink-faint); text-decoration: line-through;
+  text-decoration-color: rgba(138,116,96,0.7); margin-right: 8px;
+}
+.card-price-sale { color: #c0392b; }
+.price-off {
+  font-family: var(--sans); font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+  color: #fff; background: #c0392b; border-radius: 999px; padding: 3px 8px;
+  align-self: center; margin-left: 8px;
+}
+/* Admin bulk-sale modal: discount-mode toggle active state. */
+.sale-mode-btn.active { background: var(--ink); color: var(--gold-light); border-color: var(--ink); }
 /* Heart pill — heart icon + fake-social-proof counter (deterministic base
    per item id, +1 when visitor wishlists). Sits bottom-right of card image. */
 .heart-btn {
