@@ -646,6 +646,47 @@ export default {
       } catch (err) { return json({ ok: false, error: err.message }, 502); }
     }
 
+    // ---- Insights: site-wide event tracking (aggregated in KV) ----
+    // Public visitors POST events here; the admin reads the aggregate back.
+    // Unlike the old per-browser localStorage counters, this sums every
+    // visitor on every device into one shared tally under the "stats" key.
+    const TRACK_METRICS = new Set(["itemViews", "itemEnquiries", "itemWishlist", "itemIgClicks", "searchNoResults"]);
+    if (request.method === "POST" && path === "/api/track") {
+      let body;
+      try { body = await request.json(); } catch { return json({ error: "invalid json" }, 400); }
+      const metric = String(body.metric || "");
+      const key = String(body.key || "").slice(0, 80).trim();
+      if (!TRACK_METRICS.has(metric) || !key) return json({ error: "bad metric/key" }, 400);
+      // KV read-modify-write. Low-traffic shop, so the occasional lost
+      // concurrent increment is acceptable; KV has no atomic counter.
+      let stats;
+      try { stats = JSON.parse(await env.BAGS.get("stats")) || {}; } catch { stats = {}; }
+      stats[metric] = stats[metric] || {};
+      // Cap free-text search keys so a bot can't bloat the blob unbounded.
+      if (metric === "searchNoResults" && !(key in stats[metric]) && Object.keys(stats[metric]).length >= 800) {
+        return json({ ok: true, capped: true });
+      }
+      stats[metric][key] = (stats[metric][key] || 0) + 1;
+      stats._lastUpdated = new Date().toISOString();
+      await env.BAGS.put("stats", JSON.stringify(stats));
+      return json({ ok: true });
+    }
+
+    // Admin: read aggregated site-wide insights
+    if (request.method === "GET" && path === "/api/insights") {
+      if (!isAuthed(request, env)) return json({ error: "unauthorized" }, 401);
+      let stats;
+      try { stats = JSON.parse(await env.BAGS.get("stats")) || {}; } catch { stats = {}; }
+      return json(stats);
+    }
+
+    // Admin: reset aggregated insights (clears the shop-wide tally)
+    if (request.method === "POST" && path === "/api/insights-reset") {
+      if (!isAuthed(request, env)) return json({ error: "unauthorized" }, 401);
+      await env.BAGS.put("stats", JSON.stringify({ _lastUpdated: new Date().toISOString() }));
+      return json({ ok: true });
+    }
+
     // Admin: replace all data
     if (request.method === "POST" && path === "/api/bulk") {
       if (!isAuthed(request, env)) return json({ error: "unauthorized" }, 401);
