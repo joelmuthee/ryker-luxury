@@ -1453,40 +1453,28 @@ window.clientMessage = phone => {
   window.open(`https://wa.me/${clientWaPhone(phone)}?text=${encodeURIComponent(msg)}`, '_blank');
 };
 // Manually add / remove a client (server-synced via the clients[] list).
-// Rebuild the item <select> filtered by the search box (keeps a native, webview-
-// reliable dropdown; the search just narrows it for catalogues with many items).
-function populateClientItemOptions(filter) {
-  const q = (filter || '').toLowerCase();
-  const sel = document.getElementById('addClientItem');
-  const matches = bags.filter(b => !q || (b.name || '').toLowerCase().includes(q));
-  sel.innerHTML = '<option value="">None — just add the contact</option>' +
-    matches.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+// ----- "Item bought" autocomplete: type → tappable matches → select one -----
+let acItemId = ''; // selected item id ('' = none / contact-only)
+function acRenderResults(q) {
+  const box = document.getElementById('addClientItemResults');
+  const query = (q || '').toLowerCase();
+  if (!query) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  const matches = bags.filter(b => (b.name || '').toLowerCase().includes(query)).slice(0, 12);
+  box.innerHTML = matches.length
+    ? matches.map(b => {
+        const units = Object.values(b.stock || {}).reduce((s, n) => s + (Number(n) || 0), 0);
+        const meta = Object.keys(b.stock || {}).length ? `${units} in stock` : fmtKsh(b.price);
+        return `<button type="button" class="client-item-opt" data-id="${b.id}">${escapeHtml(b.name)}<span>${meta}</span></button>`;
+      }).join('')
+    : '<div class="client-item-empty">No items match.</div>';
+  box.style.display = '';
 }
-function openAddClient() {
-  document.getElementById('addClientName').value = '';
-  document.getElementById('addClientPhone').value = '';
-  document.getElementById('addClientNote').value = '';
-  document.getElementById('addClientItemSearch').value = '';
-  populateClientItemOptions('');
-  document.getElementById('addClientItem').value = '';
-  document.getElementById('addClientSaleFields').style.display = 'none';
-  document.getElementById('addClientModal').style.display = 'flex';
-  document.getElementById('addClientName').focus();
-}
-document.getElementById('addClientItemSearch')?.addEventListener('input', e => {
-  populateClientItemOptions(e.target.value.trim());
-  document.getElementById('addClientItem').value = '';
-  document.getElementById('addClientSaleFields').style.display = 'none';
-});
-function closeAddClient() { document.getElementById('addClientModal').style.display = 'none'; }
-document.getElementById('clientsAddBtn')?.addEventListener('click', openAddClient);
-document.getElementById('addClientCancelBtn')?.addEventListener('click', closeAddClient);
-document.getElementById('addClientModal')?.addEventListener('click', e => { if (e.target.id === 'addClientModal') closeAddClient(); });
-// Picking an item reveals size/qty/price (mirrors the Record-sale modal).
-document.getElementById('addClientItem')?.addEventListener('change', e => {
-  const wrap = document.getElementById('addClientSaleFields');
-  const bag = bags.find(b => b.id === e.target.value);
-  if (!bag) { wrap.style.display = 'none'; return; }
+function acSelectItem(id) {
+  const bag = bags.find(b => b.id === id);
+  if (!bag) return;
+  acItemId = id;
+  document.getElementById('addClientItemSearch').value = bag.name;
+  document.getElementById('addClientItemResults').style.display = 'none';
   const sizeSel = document.getElementById('addClientSize');
   sizeSel.innerHTML = '';
   const inStock = Object.entries(bag.stock || {}).filter(([, q]) => q > 0);
@@ -1497,7 +1485,41 @@ document.getElementById('addClientItem')?.addEventListener('change', e => {
   }
   document.getElementById('addClientQty').value = 1;
   document.getElementById('addClientPrice').value = (bag.salePrice > 0 && bag.salePrice < bag.price) ? bag.salePrice : bag.price;
-  wrap.style.display = '';
+  document.getElementById('addClientChosen').innerHTML = `Recording a sale for <strong>${escapeHtml(bag.name)}</strong> · <button type="button" id="addClientClearItem">clear</button>`;
+  document.getElementById('addClientChosen').style.display = '';
+  document.getElementById('addClientSaleFields').style.display = '';
+}
+function acClearItem() {
+  acItemId = '';
+  document.getElementById('addClientItemSearch').value = '';
+  document.getElementById('addClientItemResults').style.display = 'none';
+  document.getElementById('addClientChosen').style.display = 'none';
+  document.getElementById('addClientSaleFields').style.display = 'none';
+}
+function openAddClient() {
+  document.getElementById('addClientName').value = '';
+  document.getElementById('addClientPhone').value = '';
+  document.getElementById('addClientNote').value = '';
+  acClearItem();
+  document.getElementById('addClientModal').style.display = 'flex';
+  document.getElementById('addClientName').focus();
+}
+function closeAddClient() { document.getElementById('addClientModal').style.display = 'none'; }
+document.getElementById('clientsAddBtn')?.addEventListener('click', openAddClient);
+document.getElementById('addClientCancelBtn')?.addEventListener('click', closeAddClient);
+document.getElementById('addClientModal')?.addEventListener('click', e => { if (e.target.id === 'addClientModal') closeAddClient(); });
+document.getElementById('addClientItemSearch')?.addEventListener('input', e => {
+  acItemId = '';
+  document.getElementById('addClientChosen').style.display = 'none';
+  document.getElementById('addClientSaleFields').style.display = 'none';
+  acRenderResults(e.target.value.trim());
+});
+document.getElementById('addClientItemResults')?.addEventListener('click', e => {
+  const opt = e.target.closest('.client-item-opt');
+  if (opt) acSelectItem(opt.dataset.id);
+});
+document.getElementById('addClientChosen')?.addEventListener('click', e => {
+  if (e.target.id === 'addClientClearItem') acClearItem();
 });
 document.getElementById('addClientSaveBtn')?.addEventListener('click', async () => {
   const name = document.getElementById('addClientName').value.trim();
@@ -1505,7 +1527,7 @@ document.getElementById('addClientSaveBtn')?.addEventListener('click', async () 
   const note = document.getElementById('addClientNote').value.trim();
   if (!name) { showToast('Enter a name.'); return; }
   if (phone.replace(/[^0-9]/g, '').length < 9) { showToast('Enter a valid phone number.'); return; }
-  const itemId = document.getElementById('addClientItem').value;
+  const itemId = acItemId;
   let size, qty, salePrice;
   if (itemId) {
     size = document.getElementById('addClientSize').value;
