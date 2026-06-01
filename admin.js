@@ -596,12 +596,18 @@ function ensureCategoryOption(cat) {
 
 // Sweep every category already used on an item into the dropdown, so an
 // owner-added category becomes a permanent choice for all future items.
+// Works for flat OR optgroup selects: the built-in option values are
+// snapshotted once (before any custom injection) so we never re-classify
+// a built-in as custom.
+let _builtinCatValues = null;
 function syncCustomCategories() {
   const sel = document.getElementById('categoryInput');
   if (!sel) return;
-  const builtIn = new Set([...sel.querySelectorAll('optgroup:not(#customCatGroup) option')].map(o => o.value));
+  if (!_builtinCatValues) {
+    _builtinCatValues = new Set([...sel.options].map(o => o.value).filter(v => v && v !== '__new__'));
+  }
   [...new Set(bags.map(b => b.category).filter(Boolean))]
-    .filter(c => !builtIn.has(c))
+    .filter(c => !_builtinCatValues.has(c))
     .sort((a, b) => a.localeCompare(b))
     .forEach(ensureCategoryOption);
 }
