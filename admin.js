@@ -1457,6 +1457,11 @@ function openAddClient() {
   document.getElementById('addClientName').value = '';
   document.getElementById('addClientPhone').value = '';
   document.getElementById('addClientNote').value = '';
+  const itemSel = document.getElementById('addClientItem');
+  itemSel.innerHTML = '<option value="">None — just add the contact</option>' +
+    bags.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+  itemSel.value = '';
+  document.getElementById('addClientSaleFields').style.display = 'none';
   document.getElementById('addClientModal').style.display = 'flex';
   document.getElementById('addClientName').focus();
 }
@@ -1464,12 +1469,36 @@ function closeAddClient() { document.getElementById('addClientModal').style.disp
 document.getElementById('clientsAddBtn')?.addEventListener('click', openAddClient);
 document.getElementById('addClientCancelBtn')?.addEventListener('click', closeAddClient);
 document.getElementById('addClientModal')?.addEventListener('click', e => { if (e.target.id === 'addClientModal') closeAddClient(); });
+// Picking an item reveals size/qty/price (mirrors the Record-sale modal).
+document.getElementById('addClientItem')?.addEventListener('change', e => {
+  const wrap = document.getElementById('addClientSaleFields');
+  const bag = bags.find(b => b.id === e.target.value);
+  if (!bag) { wrap.style.display = 'none'; return; }
+  const sizeSel = document.getElementById('addClientSize');
+  sizeSel.innerHTML = '';
+  const inStock = Object.entries(bag.stock || {}).filter(([, q]) => q > 0);
+  if (inStock.length) {
+    inStock.forEach(([sz, q]) => { const o = document.createElement('option'); o.value = sz; o.textContent = `${sz} (${q} in stock)`; sizeSel.appendChild(o); });
+  } else {
+    const o = document.createElement('option'); o.value = 'One size'; o.textContent = 'One size'; sizeSel.appendChild(o);
+  }
+  document.getElementById('addClientQty').value = 1;
+  document.getElementById('addClientPrice').value = (bag.salePrice > 0 && bag.salePrice < bag.price) ? bag.salePrice : bag.price;
+  wrap.style.display = '';
+});
 document.getElementById('addClientSaveBtn')?.addEventListener('click', async () => {
   const name = document.getElementById('addClientName').value.trim();
   const phone = document.getElementById('addClientPhone').value.trim().replace(/[^0-9+]/g, '');
   const note = document.getElementById('addClientNote').value.trim();
   if (!name) { showToast('Enter a name.'); return; }
   if (phone.replace(/[^0-9]/g, '').length < 9) { showToast('Enter a valid phone number.'); return; }
+  const itemId = document.getElementById('addClientItem').value;
+  let size, qty, salePrice;
+  if (itemId) {
+    size = document.getElementById('addClientSize').value;
+    qty = parseInt(document.getElementById('addClientQty').value, 10) || 1;
+    salePrice = parseInt(document.getElementById('addClientPrice').value, 10);
+  }
   const btn = document.getElementById('addClientSaveBtn');
   btn.disabled = true;
   try {
@@ -1479,10 +1508,17 @@ document.getElementById('addClientSaveBtn')?.addEventListener('click', async () 
       const existing = clients.find(c => String(c.phone).replace(/[^0-9]/g, '') === norm);
       if (existing) { existing.name = name; existing.note = note; }
       else clients.push({ id: 'c_' + Date.now(), name, phone, note, createdAt: new Date().toISOString() });
+      if (itemId) {
+        const bag = bags.find(b => b.id === itemId);
+        if (!bag) throw new Error('Item no longer exists — refresh admin');
+        if (bag.stock && bag.stock[size] !== undefined) bag.stock[size] = Math.max(0, bag.stock[size] - qty);
+        if (!bag.sales) bag.sales = [];
+        bag.sales.push({ size, qty, salePrice: salePrice || bag.price, buyerName: name, buyerPhone: phone, notes: note, soldAt: new Date().toISOString() });
+      }
     });
     closeAddClient();
-    renderClients();
-    showToast('Client saved.');
+    renderClients(); renderDashboard(); renderInventory(); renderList();
+    showToast(itemId ? 'Client saved + sale recorded.' : 'Client saved.');
   } catch (e) { showToast('Save failed: ' + e.message); }
   finally { btn.disabled = false; }
 });

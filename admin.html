@@ -579,7 +579,7 @@
 <div id="addClientModal" class="modal" style="display:none;">
   <div class="modal-card">
     <h3>Add a client</h3>
-    <p class="sub">Save someone who hasn't bought yet — a DM enquiry, a walk-in, a referral. They'll appear in your Clients list so you can WhatsApp them when new stock lands.</p>
+    <p class="sub">Save a contact — a DM enquiry, a walk-in, a referral. Optionally pick what they bought and it's recorded as a real sale.</p>
     <div class="field">
       <label>Name</label>
       <input id="addClientName" type="text" placeholder="e.g. Sarah Kamau">
@@ -592,6 +592,17 @@
       <label>Note <small style="font-weight:400;color:#999;">optional</small></label>
       <input id="addClientNote" type="text" placeholder="e.g. asked about size 42 loafers">
     </div>
+    <div class="field">
+      <label>Item bought <small style="font-weight:400;color:#999;">— optional. Records a real sale: drops stock, counts in your Sales totals.</small></label>
+      <select id="addClientItem"><option value="">None — just add the contact</option></select>
+    </div>
+    <div id="addClientSaleFields" style="display:none;">
+      <div class="field-row">
+        <div class="field"><label>Size</label><select id="addClientSize"></select></div>
+        <div class="field"><label>Qty</label><input id="addClientQty" type="number" min="1" value="1"></div>
+        <div class="field"><label>Price (Ksh)</label><input id="addClientPrice" type="number" min="0" step="100"></div>
+      </div>
+    </div>
     <div class="admin-actions" style="margin-top:18px;">
       <button class="btn-admin primary" id="addClientSaveBtn">Save client</button>
       <button class="btn-admin danger" id="addClientCancelBtn">Cancel</button>
@@ -599,6 +610,6 @@
   </div>
 </div>
 
-<script src="admin.js?v=20260601e"></script>
+<script src="admin.js?v=20260601f"></script>
 </body>
 </html>
