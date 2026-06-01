@@ -1453,18 +1453,31 @@ window.clientMessage = phone => {
   window.open(`https://wa.me/${clientWaPhone(phone)}?text=${encodeURIComponent(msg)}`, '_blank');
 };
 // Manually add / remove a client (server-synced via the clients[] list).
+// Rebuild the item <select> filtered by the search box (keeps a native, webview-
+// reliable dropdown; the search just narrows it for catalogues with many items).
+function populateClientItemOptions(filter) {
+  const q = (filter || '').toLowerCase();
+  const sel = document.getElementById('addClientItem');
+  const matches = bags.filter(b => !q || (b.name || '').toLowerCase().includes(q));
+  sel.innerHTML = '<option value="">None — just add the contact</option>' +
+    matches.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+}
 function openAddClient() {
   document.getElementById('addClientName').value = '';
   document.getElementById('addClientPhone').value = '';
   document.getElementById('addClientNote').value = '';
-  const itemSel = document.getElementById('addClientItem');
-  itemSel.innerHTML = '<option value="">None — just add the contact</option>' +
-    bags.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
-  itemSel.value = '';
+  document.getElementById('addClientItemSearch').value = '';
+  populateClientItemOptions('');
+  document.getElementById('addClientItem').value = '';
   document.getElementById('addClientSaleFields').style.display = 'none';
   document.getElementById('addClientModal').style.display = 'flex';
   document.getElementById('addClientName').focus();
 }
+document.getElementById('addClientItemSearch')?.addEventListener('input', e => {
+  populateClientItemOptions(e.target.value.trim());
+  document.getElementById('addClientItem').value = '';
+  document.getElementById('addClientSaleFields').style.display = 'none';
+});
 function closeAddClient() { document.getElementById('addClientModal').style.display = 'none'; }
 document.getElementById('clientsAddBtn')?.addEventListener('click', openAddClient);
 document.getElementById('addClientCancelBtn')?.addEventListener('click', closeAddClient);

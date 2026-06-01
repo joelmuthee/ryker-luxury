@@ -589,11 +589,8 @@
       <input id="addClientPhone" type="tel" placeholder="0712345678">
     </div>
     <div class="field">
-      <label>Note <small style="font-weight:400;color:#999;">optional</small></label>
-      <input id="addClientNote" type="text" placeholder="e.g. asked about size 42 loafers">
-    </div>
-    <div class="field">
       <label>Item bought <small style="font-weight:400;color:#999;">— optional. Records a real sale: drops stock, counts in your Sales totals.</small></label>
+      <input id="addClientItemSearch" type="search" placeholder="Search items by name…" autocomplete="off" style="margin-bottom:8px;">
       <select id="addClientItem"><option value="">None — just add the contact</option></select>
     </div>
     <div id="addClientSaleFields" style="display:none;">
@@ -603,6 +600,10 @@
         <div class="field"><label>Price (Ksh)</label><input id="addClientPrice" type="number" min="0" step="100"></div>
       </div>
     </div>
+    <div class="field">
+      <label>Note <small style="font-weight:400;color:#999;">optional</small></label>
+      <input id="addClientNote" type="text" placeholder="e.g. asked about size 42 loafers">
+    </div>
     <div class="admin-actions" style="margin-top:18px;">
       <button class="btn-admin primary" id="addClientSaveBtn">Save client</button>
       <button class="btn-admin danger" id="addClientCancelBtn">Cancel</button>
@@ -610,6 +611,6 @@
   </div>
 </div>
 
-<script src="admin.js?v=20260601g"></script>
+<script src="admin.js?v=20260601h"></script>
 </body>
 </html>
