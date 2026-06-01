@@ -5,6 +5,7 @@ const ADMIN_TOKEN = atob('cnlrZXItYWRtaW4tdG9rZW4tMjAyNi1zZWN1cmU=');
 
 let bags = [];
 let settings = {};
+let clients = []; // manually-added clients (server-synced); sale buyers are derived separately
 let editingId = null;
 let stagedImage = null; // { base64, ext, dataUrl }
 let pendingSaleId = null;
@@ -59,7 +60,7 @@ async function apiPublish() {
   const res = await fetch(`${API_BASE}/api/bulk`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ADMIN_TOKEN}` },
-    body: JSON.stringify({ bags, settings }),
+    body: JSON.stringify({ bags, settings, clients }),
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Save failed: ${res.status}`); }
 }
@@ -76,6 +77,7 @@ async function apiMutateAndPublish(mutate) {
   const json = await res.json();
   bags = Array.isArray(json.bags) ? json.bags : [];
   settings = json.settings || {};
+  clients = Array.isArray(json.clients) ? json.clients : [];
   await mutate();
   await apiPublish();
 }
@@ -86,6 +88,7 @@ async function loadData() {
   const json = await res.json();
   bags = json.bags || [];
   settings = json.settings || {};
+  clients = Array.isArray(json.clients) ? json.clients : [];
   accountSuspended = !!json.suspended;
 }
 
@@ -1367,6 +1370,18 @@ function clientsLedger() {
       else if (!c.name && s.buyerName) c.name = s.buyerName;
     }
   }
+  // Overlay manually-added clients (may have zero purchases yet).
+  for (const mc of (clients || [])) {
+    if (!mc || !mc.phone) continue;
+    const phone = String(mc.phone).replace(/[^0-9]/g, '');
+    if (phone.length < 9) continue;
+    let c = map.get(phone);
+    if (!c) { c = { phone, name: '', purchases: [], spend: 0, lastAt: 0 }; map.set(phone, c); }
+    c.manualId = mc.id;
+    if (mc.note) c.note = mc.note;
+    if (!c.name && mc.name) c.name = mc.name;
+    if (mc.createdAt) c.addedAt = mc.createdAt;
+  }
   return [...map.values()];
 }
 // Normalise a Kenyan number to wa.me international form (254…, no +).
@@ -1410,15 +1425,23 @@ function renderClients() {
     const items = c.purchases.slice()
       .sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0))
       .map(p => `<span class="client-item">${escapeHtml(p.bagName)}${p.size ? ' · ' + escapeHtml(p.size) : ''} × ${p.qty} · ${fmtKsh(p.amount)}</span>`).join('');
+    const has = c.purchases.length;
+    const when = has ? `last ${relTime(new Date(c.lastAt).toISOString())}`
+                     : (c.addedAt ? `added ${relTime(c.addedAt)}` : 'no purchases yet');
+    const manualTag = c.manualId ? '<span class="client-tag">Added manually</span>' : '';
+    const noteLine = c.note ? `<div class="client-note">${escapeHtml(c.note)}</div>` : '';
+    const removeBtn = c.manualId ? `<button class="btn-admin danger" onclick="removeClient('${c.manualId}')">Remove</button>` : '';
     return `
       <div class="client-row">
         <div class="client-row-main">
-          <div class="client-row-name">${escapeHtml(c.name || 'Unnamed buyer')}</div>
-          <div class="client-row-sub">${escapeHtml(c.phone)} · ${c.purchases.length} purchase${c.purchases.length === 1 ? '' : 's'} · ${fmtKsh(c.spend)} spent · last ${relTime(new Date(c.lastAt).toISOString())}</div>
+          <div class="client-row-name">${escapeHtml(c.name || 'Unnamed buyer')}${manualTag}</div>
+          <div class="client-row-sub">${escapeHtml(c.phone)} · ${has} purchase${has === 1 ? '' : 's'} · ${fmtKsh(c.spend)} spent · ${when}</div>
+          ${noteLine}
           <div class="client-items">${items}</div>
         </div>
         <div class="client-row-actions">
           <button class="btn-admin gold" onclick="clientMessage('${c.phone}')">WhatsApp</button>
+          ${removeBtn}
         </div>
       </div>`;
   }).join('');
@@ -1428,6 +1451,48 @@ window.clientMessage = phone => {
   const first = (c && c.name ? c.name : 'there').split(' ')[0];
   const msg = `Hi ${first}! Thanks for shopping with Ryker Luxury. Fresh pieces just landed. Want me to send you what's new?`;
   window.open(`https://wa.me/${clientWaPhone(phone)}?text=${encodeURIComponent(msg)}`, '_blank');
+};
+// Manually add / remove a client (server-synced via the clients[] list).
+function openAddClient() {
+  document.getElementById('addClientName').value = '';
+  document.getElementById('addClientPhone').value = '';
+  document.getElementById('addClientNote').value = '';
+  document.getElementById('addClientModal').style.display = 'flex';
+  document.getElementById('addClientName').focus();
+}
+function closeAddClient() { document.getElementById('addClientModal').style.display = 'none'; }
+document.getElementById('clientsAddBtn')?.addEventListener('click', openAddClient);
+document.getElementById('addClientCancelBtn')?.addEventListener('click', closeAddClient);
+document.getElementById('addClientModal')?.addEventListener('click', e => { if (e.target.id === 'addClientModal') closeAddClient(); });
+document.getElementById('addClientSaveBtn')?.addEventListener('click', async () => {
+  const name = document.getElementById('addClientName').value.trim();
+  const phone = document.getElementById('addClientPhone').value.trim().replace(/[^0-9+]/g, '');
+  const note = document.getElementById('addClientNote').value.trim();
+  if (!name) { showToast('Enter a name.'); return; }
+  if (phone.replace(/[^0-9]/g, '').length < 9) { showToast('Enter a valid phone number.'); return; }
+  const btn = document.getElementById('addClientSaveBtn');
+  btn.disabled = true;
+  try {
+    await apiMutateAndPublish(() => {
+      if (!Array.isArray(clients)) clients = [];
+      const norm = phone.replace(/[^0-9]/g, '');
+      const existing = clients.find(c => String(c.phone).replace(/[^0-9]/g, '') === norm);
+      if (existing) { existing.name = name; existing.note = note; }
+      else clients.push({ id: 'c_' + Date.now(), name, phone, note, createdAt: new Date().toISOString() });
+    });
+    closeAddClient();
+    renderClients();
+    showToast('Client saved.');
+  } catch (e) { showToast('Save failed: ' + e.message); }
+  finally { btn.disabled = false; }
+});
+window.removeClient = async (id) => {
+  if (!await confirmAction('Remove this client from your list? Their past sales (if any) stay in your records.', 'Remove')) return;
+  try {
+    await apiMutateAndPublish(() => { clients = (clients || []).filter(c => c.id !== id); });
+    renderClients();
+    showToast('Client removed.');
+  } catch (e) { showToast('Remove failed: ' + e.message); }
 };
 document.getElementById('clientsSearch')?.addEventListener('input', e => { clientsQuery = e.target.value.trim(); renderClients(); });
 document.getElementById('clientsSort')?.addEventListener('change', e => { clientsSort = e.target.value; renderClients(); });
