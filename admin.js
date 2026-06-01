@@ -1532,17 +1532,8 @@ window.removeClient = async (id) => {
 };
 document.getElementById('clientsSearch')?.addEventListener('input', e => { clientsQuery = e.target.value.trim(); renderClients(); });
 document.getElementById('clientsSort')?.addEventListener('change', e => { clientsSort = e.target.value; renderClients(); });
-// "NEW" badge on the Clients nav link — dismisses for good once the owner opens the tab.
-(function () {
-  const badge = document.getElementById('clientsNavNew');
-  if (!badge) return;
-  const KEY = 'clients_tab_seen';
-  try { if (localStorage.getItem(KEY)) { badge.style.display = 'none'; return; } } catch (_) {}
-  document.getElementById('clientsNavLink')?.addEventListener('click', () => {
-    badge.style.display = 'none';
-    try { localStorage.setItem(KEY, '1'); } catch (_) {}
-  });
-})();
+// "NEW" badge on the Clients nav link — kept permanently visible (owner asked
+// for it to always show). No auto-dismiss; the badge renders from the HTML/CSS.
 
 // ====== WHATSAPP BROADCAST ======
 let broadcastSelectedIds = [];
