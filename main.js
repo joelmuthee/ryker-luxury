@@ -40,6 +40,14 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
 
   // Per-browser tracking. Admin reads the same localStorage on the same device.
   const ANALYTICS_KEY = 'ryker_analytics';
+  // Mirror a key action to Google Analytics as an event, so GA reflects real
+  // intent (Enquire taps, item views) instead of engagement-time — which reads
+  // near-zero for this funnel (visitors bounce straight to WhatsApp, and
+  // link-preview bots load pages without ever engaging). No-op if GA absent.
+  function gaEvent(name, params) {
+    try { if (window.gtag) window.gtag('event', name, params || {}); } catch (_) {}
+  }
+
   function track(metric, key) {
     if (!key) return;
     try {
@@ -551,6 +559,7 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
         enquire.href = whatsappLink(item, false, selected.dataset.size);
       }
       track('itemEnquiries', id);
+      gaEvent('enquire', { item_id: id });
       // Enquire opens WhatsApp directly via the wa.me href (anchor, target=_blank).
       // No native share sheet — the OS "select an app" chooser confused buyers.
     }
@@ -592,6 +601,7 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     const item = items.find(i => i.id === id);
     if (!item) return;
     track('itemViews', id);
+    gaEvent('item_view', { item_id: id });
     lightboxImages = itemImages(item);
     // Start at the slide the card is currently showing
     const carousel = wrap.querySelector('.card-carousel');
