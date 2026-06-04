@@ -315,7 +315,7 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     const u = String(s).toUpperCase();
     if (u.startsWith('UK')) return 'Shoe size (UK)';
     if (u.startsWith('EU')) return 'Shoe size (EU)';
-    if (/LARGE|MEDIUM|SMALL/.test(u) || /^(XS|S|M|L|XL|XXL|XXXL|\dXL)$/.test(u)) return 'Letter sizes';
+    if (/LARGE|MEDIUM|SMALL/.test(u) || /^(XS|S|M|L|XL|XXL|XXXL|\dXL)$/.test(u)) return 'Top sizes';
     if (/\d/.test(u)) return 'Waist / number';
     return 'Other';
   }
@@ -323,7 +323,7 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
   function buildSizePills() {
     const sizes = getAllSizesForFilter();
     if (sizes.length < 2) { sizePills.innerHTML = ''; return; }
-    const order = ['Letter sizes', 'Waist / number', 'Shoe size (UK)', 'Shoe size (EU)', 'Other'];
+    const order = ['Top sizes', 'Waist / number', 'Shoe size (UK)', 'Shoe size (EU)', 'Other'];
     const grouped = {};
     sizes.forEach(s => { (grouped[sizeGroup(s)] = grouped[sizeGroup(s)] || []).push(s); });
     const groups = [{ label: null, options: [{ val: 'all', text: 'All sizes' }] }];
