@@ -183,6 +183,12 @@ img { max-width: 100%; display: block; }
 }
 .sort-select:focus { outline: none; border-color: var(--gold); }
 
+/* Category + size filter dropdowns (compact, replaces long pill rows) */
+.filter-drop { flex: 0 1 auto; min-width: 0; }
+.filter-select { width: 100%; max-width: 100%; }
+@media (max-width: 600px) { .filter-drop { flex: 1 1 calc(50% - 5px); } }
+
+
 /* NEW / Stock urgency / Heart badges */
 .badge-new {
   position: absolute; top: 14px; left: 14px;

@@ -232,38 +232,38 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
   function buildCatPills() {
     const cats = getCategories();
     if (!cats.length) { catPills.innerHTML = ''; return; }
-    catPills.innerHTML = [
-      `<button class="pill pill--cat ${currentCat === 'all' ? 'active' : ''}" data-cat="all">All styles</button>`,
-      ...cats.map(c => `<button class="pill pill--cat ${currentCat === c ? 'active' : ''}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</button>`)
-    ].join('');
-    catPills.querySelectorAll('.pill--cat').forEach(p => {
-      p.addEventListener('click', () => {
-        catPills.querySelectorAll('.pill--cat').forEach(x => x.classList.remove('active'));
-        p.classList.add('active');
-        currentCat = p.dataset.cat;
-        currentSize = 'all';
-        currentPage = 1;
-        render();
-      });
-    });
+    catPills.innerHTML = `<select class="sort-select filter-select" id="catSelect" aria-label="Filter by category"><option value="all">All categories</option>`
+      + cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('') + `</select>`;
+    const sel = document.getElementById('catSelect');
+    sel.value = currentCat;
+    sel.addEventListener('change', () => { currentCat = sel.value; currentSize = 'all'; currentPage = 1; render(); });
+  }
+
+  // Group a size token for the size dropdown (apparel + footwear verticals).
+  function sizeGroup(s) {
+    const u = String(s).toUpperCase();
+    if (u.startsWith('UK')) return 'Shoe size (UK)';
+    if (u.startsWith('EU')) return 'Shoe size (EU)';
+    if (/LARGE|MEDIUM|SMALL/.test(u) || /^(XS|S|M|L|XL|XXL|XXXL|\dXL)$/.test(u)) return 'Letter sizes';
+    if (/\d/.test(u)) return 'Waist / number';
+    return 'Other';
   }
 
   function buildSizePills() {
     const sizes = getAllSizesForFilter();
     if (sizes.length < 2) { sizePills.innerHTML = ''; return; }
-    sizePills.innerHTML = [
-      `<button class="pill pill--size ${currentSize === 'all' ? 'active' : ''}" data-size="all">All sizes</button>`,
-      ...sizes.map(s => `<button class="pill pill--size ${currentSize === s ? 'active' : ''}" data-size="${escapeHtml(s)}">${escapeHtml(s)}</button>`)
-    ].join('');
-    sizePills.querySelectorAll('.pill--size').forEach(p => {
-      p.addEventListener('click', () => {
-        sizePills.querySelectorAll('.pill--size').forEach(x => x.classList.remove('active'));
-        p.classList.add('active');
-        currentSize = p.dataset.size;
-        currentPage = 1;
-        render();
-      });
+    const order = ['Letter sizes', 'Waist / number', 'Shoe size (UK)', 'Shoe size (EU)', 'Other'];
+    const groups = {};
+    sizes.forEach(s => { (groups[sizeGroup(s)] = groups[sizeGroup(s)] || []).push(s); });
+    let opts = `<option value="all">All sizes</option>`;
+    order.forEach(g => {
+      if (!groups[g] || !groups[g].length) return;
+      opts += `<optgroup label="${g}">` + groups[g].map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('') + `</optgroup>`;
     });
+    sizePills.innerHTML = `<select class="sort-select filter-select" id="sizeSelect" aria-label="Filter by size">${opts}</select>`;
+    const sel = document.getElementById('sizeSelect');
+    sel.value = currentSize;
+    sel.addEventListener('change', () => { currentSize = sel.value; currentPage = 1; render(); });
   }
 
   function sizeMatch(item) {
