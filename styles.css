@@ -197,6 +197,13 @@ img { max-width: 100%; display: block; }
 }
 .cdrop-current { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cdrop.open .cdrop-trigger { border-color: var(--gold); }
+/* Active (non-"All") filter — gold tint so a set filter reads as deliberate,
+   not a default. */
+.cdrop--active .cdrop-trigger {
+  background-color: rgba(184, 149, 106, 0.14);
+  border-color: var(--gold);
+  color: var(--ink); font-weight: 600;
+}
 .cdrop-panel {
   position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 60;
   background: #fff; border: 1px solid var(--line); border-radius: 14px;

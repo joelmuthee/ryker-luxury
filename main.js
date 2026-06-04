@@ -248,7 +248,8 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
       (g.label ? `<div class="cdrop-group">${escapeHtml(g.label)}</div>` : '') +
       g.options.map(o => `<button type="button" role="option" class="cdrop-opt${o.val === value ? ' selected' : ''}" data-val="${escapeHtml(o.val)}"${o.val === value ? ' aria-selected="true"' : ''}>${escapeHtml(o.text)}</button>`).join('')
     ).join('');
-    return `<div class="cdrop filter-select" data-kind="${kind}" aria-label="${escapeHtml(ariaLabel)}">`
+    const active = value && value !== 'all';
+    return `<div class="cdrop filter-select${active ? ' cdrop--active' : ''}" data-kind="${kind}" aria-label="${escapeHtml(ariaLabel)}">`
       + `<button type="button" class="cdrop-trigger sort-select" aria-haspopup="listbox" aria-expanded="false"><span class="cdrop-current">${escapeHtml(cur.text)}</span></button>`
       + `<div class="cdrop-panel" role="listbox" hidden><div class="cdrop-scroll">${body}</div><div class="cdrop-morehint" aria-hidden="true"></div></div>`
       + `</div>`;
