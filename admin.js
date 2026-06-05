@@ -1808,7 +1808,7 @@ function renderOwed() {
   if (!rows.length) { listEl.innerHTML = '<p style="font-size:13px;color:#999;padding:14px;">No customers match your search.</p>'; return; }
   listEl.innerHTML = rows.map(c => {
     const items = c.lines.slice().sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0))
-      .map(l => `<span class="client-item">${escapeHtml(l.bagName)}${l.size ? ' · ' + escapeHtml(l.size) : ''} · owes ${fmtKsh(l.balance)} of ${fmtKsh(l.total)} · taken ${fmtDate(l.at)} (${relTime(l.at)})${l.notes ? ` · <em>${escapeHtml(l.notes)}</em>` : ''}</span>`).join('');
+      .map(l => `<span class="owed-line">${escapeHtml(l.bagName)}${l.size ? ' · ' + escapeHtml(l.size) : ''} · owes ${fmtKsh(l.balance)} of ${fmtKsh(l.total)} · taken ${fmtDate(l.at)} (${relTime(l.at)})${l.notes ? ` · <em>${escapeHtml(l.notes)}</em>` : ''}</span>`).join('');
     const noPhone = !c.phone;
     const title = noPhone ? 'Buyer not saved' : (c.name || 'Unnamed customer');
     const sub = noPhone
@@ -1824,7 +1824,7 @@ function renderOwed() {
           <div class="client-row-name">${escapeHtml(title)} <span class="owed-amount">owes ${fmtKsh(c.owed)}</span></div>
           <div class="client-row-sub">${sub}</div>
           ${noteLine}
-          <div class="client-items">${items}</div>
+          <div class="owed-lines">${items}</div>
         </div>
         <div class="client-row-actions">${actions}</div>
       </div>`;

@@ -1387,6 +1387,9 @@ html { scroll-behavior: smooth; }
 .owed-amount { color: #b3301f; font-weight: 700; }
 .owed-tag { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; color: #b3301f; background: #fff0ee; border: 1px solid #f0c2c2; border-radius: 5px; padding: 0 6px; vertical-align: middle; }
 .owed-row { border-left: 3px solid #e05050; }
+.owed-lines { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.owed-line { font-size: 12px; color: #6b5b3a; background: #faf6ec; border: 1px solid #e8dcbf; border-radius: 8px; padding: 5px 10px; line-height: 1.45; overflow-wrap: anywhere; }
+.owed-line em { color: var(--ink-soft, #6b5b48); }
 .admin-nav a.admin-nav-owed-on { background: #fff0ee; color: #b3301f; border-color: #f0c2c2; }
 .paid-hint { font-size: 12px; color: #b3301f; margin: 5px 0 0; font-weight: 600; }
 .paid-row { display: flex; gap: 8px; align-items: stretch; }
