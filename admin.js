@@ -1885,8 +1885,12 @@ window.remindDebt = phone => {
   const c = owedLedger().find(x => x.phone === phone);
   if (!c) return;
   const first = (c.name || 'there').split(' ')[0];
-  const items = c.lines.map(l => `• ${l.bagName}${l.size ? ' (' + l.size + ')' : ''} (taken ${fmtDate(l.at)}): balance ${fmtKsh(l.balance)}`).join('\n');
-  const msg = `Hi ${first}, hope you're well. A friendly reminder about your balance with Ryker Luxury:\n${items}\nTotal still owing: ${fmtKsh(c.owed)}. You can pay via M-Pesa whenever you're ready. Thank you.`;
+  const n = c.lines.length;
+  const list = c.lines.map((l, i) => `${i + 1}. *${l.bagName}*${l.size ? ' (' + l.size + ')' : ''}\n    Taken ${fmtDate(l.at)} · balance ${fmtKsh(l.balance)}`).join('\n');
+  const intro = n === 1
+    ? `A friendly reminder about your balance on the item you took from Ryker Luxury:`
+    : `A friendly reminder about the ${n} items you took from Ryker Luxury that still have a balance:`;
+  const msg = `Hi ${first}, hope you're doing well.\n\n${intro}\n\n${list}\n\n*Total still owing: ${fmtKsh(c.owed)}*\nYou can pay via M-Pesa whenever you're ready. Thank you!`;
   window.open(`https://wa.me/${clientWaPhone(phone)}?text=${encodeURIComponent(msg)}`, '_blank');
 };
 
