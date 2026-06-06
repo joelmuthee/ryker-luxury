@@ -2,6 +2,7 @@
 const ADMIN_PASSWORD = 'ryker123';
 const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
 const ADMIN_TOKEN = atob('cnlrZXItYWRtaW4tdG9rZW4tMjAyNi1zZWN1cmU=');
+const SHOP_URL = 'https://rykerluxury.co.ke'; // public storefront — used in WhatsApp messages to clients
 
 let bags = [];
 let settings = {};
@@ -798,7 +799,7 @@ function openSaleModal(id) {
   buyerName.value = '';
   buyerPhone.value = '';
   buyerNotes.value = '';
-  document.querySelectorAll('#saleModalPay .pos-pay-btn').forEach(b => b.classList.toggle('active', b.dataset.pay === 'cash'));
+  document.querySelectorAll('#saleModalPay .pos-pay-btn').forEach(b => b.classList.toggle('active', b.dataset.pay === 'mpesa'));
   saleModal.style.display = 'flex';
   buyerName.focus();
 }
@@ -813,7 +814,7 @@ async function recordSale(withBuyer) {
   const size = saleSizeInput.value;
   const qty = parseInt(saleQtyInput.value, 10) || 1;
   const salePrice = parseInt(salePriceInput.value, 10) || curBag.price;
-  const payMethod = document.querySelector('#saleModalPay .pos-pay-btn.active')?.dataset.pay || 'cash';
+  const payMethod = document.querySelector('#saleModalPay .pos-pay-btn.active')?.dataset.pay || 'mpesa';
   const total = salePrice * qty;
   // Skip path = quick full-payment sale; only the "with buyer" path can leave a balance.
   let amountPaid = total;
@@ -1708,7 +1709,7 @@ function renderClients() {
 window.clientMessage = phone => {
   const c = clientsLedger().find(x => x.phone === phone);
   const first = (c && c.name ? c.name : 'there').split(' ')[0];
-  const msg = `Hi ${first}! Thanks for shopping with Ryker Luxury. Fresh pieces just landed. Want me to send you what's new?`;
+  const msg = `Hi ${first}! Thanks for shopping with Ryker Luxury. Fresh pieces just landed. Browse what's new here: ${SHOP_URL}\n\nReply here if anything catches your eye. 🤍`;
   window.open(`https://wa.me/${clientWaPhone(phone)}?text=${encodeURIComponent(msg)}`, '_blank');
 };
 // Manually add / remove a client (server-synced via the clients[] list).
@@ -1949,7 +1950,7 @@ function openPayDebt(phone) {
   document.getElementById('payDebtName').textContent = c.name || c.phone;
   document.getElementById('payDebtOwed').textContent = fmtKsh(c.owed);
   document.getElementById('payDebtAmount').value = c.owed;
-  document.querySelectorAll('#payDebtPay .pos-pay-btn').forEach(b => b.classList.toggle('active', b.dataset.pay === 'cash'));
+  document.querySelectorAll('#payDebtPay .pos-pay-btn').forEach(b => b.classList.toggle('active', b.dataset.pay === 'mpesa'));
   document.getElementById('payDebtModal').style.display = 'flex';
   document.getElementById('payDebtAmount').focus();
 }
@@ -1961,7 +1962,7 @@ document.getElementById('payDebtPay')?.addEventListener('click', e => { const b 
 document.getElementById('payDebtSaveBtn')?.addEventListener('click', async () => {
   const phone = payingPhone;
   const amount = parseInt(document.getElementById('payDebtAmount').value, 10);
-  const method = document.querySelector('#payDebtPay .pos-pay-btn.active')?.dataset.pay || 'cash';
+  const method = document.querySelector('#payDebtPay .pos-pay-btn.active')?.dataset.pay || 'mpesa';
   if (!phone) return;
   if (isNaN(amount) || amount <= 0) { showToast('Enter how much they paid.'); return; }
   closePayDebt();
@@ -2227,11 +2228,10 @@ function buildBroadcastMessage(recipientName) {
   const subject = (document.getElementById('broadcastSubject')?.value || '').trim();
   const items = broadcastSelectedIds.map(id => bags.find(b => b.id === id)).filter(Boolean);
   const itemsBlock = items.length
-    ? '\n\n' + items.map((b, i) => `${i + 1}. *${b.name}*${b.price > 0 ? ' — ' + fmtKsh(b.price) : ''}`).join('\n')
+    ? '\n\n' + items.map((b, i) => `${i + 1}. *${b.name}*${b.price > 0 ? ' · ' + fmtKsh(b.price) : ''}`).join('\n')
     : '';
-  const lookUrl = 'https://rykerluxury.co.ke';
   const greet = recipientName ? `Hi ${recipientName.split(' ')[0]}! ` : 'Hi! ';
-  return `${greet}It's Ryker Luxury — ${subject || 'fresh stock just landed'}.${itemsBlock}\n\nTap to browse: ${lookUrl}\n\nReply here to enquire. 🤍`;
+  return `${greet}It's Ryker Luxury, ${subject || 'fresh stock just landed'}.${itemsBlock}\n\nTap to browse: ${SHOP_URL}\n\nReply here to enquire. 🤍`;
 }
 
 function renderBroadcastPreview() {
@@ -2268,7 +2268,7 @@ function renderBroadcastStepper() {
     return;
   }
   const r = bcQueue[bcIdx];
-  const href = `https://wa.me/${r.phone}?text=${encodeURIComponent(buildBroadcastMessage(r.name))}`;
+  const href = `https://wa.me/${clientWaPhone(r.phone)}?text=${encodeURIComponent(buildBroadcastMessage(r.name))}`;
   el.style.display = 'block';
   el.innerHTML = `
     <div class="bc-step-head">Sending ${bcIdx + 1} of ${bcQueue.length}</div>
@@ -2318,7 +2318,7 @@ document.getElementById('broadcastStartBtn')?.addEventListener('click', async ()
     }
     const r = recipients[i++];
     const msg = buildBroadcastMessage(r.name);
-    window.open(`https://wa.me/${r.phone}?text=${encodeURIComponent(msg)}`, '_blank');
+    window.open(`https://wa.me/${clientWaPhone(r.phone)}?text=${encodeURIComponent(msg)}`, '_blank');
     document.getElementById('broadcastStatus').textContent = `Opening ${i} of ${recipients.length}…`;
     setTimeout(next, 700);
   }
@@ -2596,7 +2596,7 @@ function initNavScrollSpy() {
 // pushes a sales[] entry tagged { paymentMethod, channel:'shop' } so it shows in
 // the Sales dashboard + the Cash/M-Pesa "today" split.
 let posItemId = '';
-let posPayMethod = 'cash';
+let posPayMethod = 'mpesa';
 let lastPosSale = null;
 
 function posWaPhone(p) {
@@ -2638,7 +2638,7 @@ function posSelectItem(id) {
 }
 
 function posReset() {
-  posItemId = ''; posPayMethod = 'cash';
+  posItemId = ''; posPayMethod = 'mpesa';
   ['posItemSearch', 'posBuyerName', 'posBuyerPhone', 'posPaid', 'posNotes'].forEach(i => { const el = document.getElementById(i); if (el) el.value = ''; });
   document.getElementById('posItemResults').style.display = 'none';
   document.getElementById('posChosen').style.display = 'none';
@@ -2648,7 +2648,7 @@ function posReset() {
   document.getElementById('posPaidHint').style.display = 'none';
   document.getElementById('posPaidNone').classList.remove('active');
   document.getElementById('posDate').value = todayInputValue();
-  document.querySelectorAll('#posPay .pos-pay-btn').forEach(b => b.classList.toggle('active', b.dataset.pay === 'cash'));
+  document.querySelectorAll('#posPay .pos-pay-btn').forEach(b => b.classList.toggle('active', b.dataset.pay === 'mpesa'));
 }
 
 function posReceiptText(s) {
