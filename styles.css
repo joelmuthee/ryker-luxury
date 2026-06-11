@@ -933,6 +933,84 @@ html { scroll-behavior: smooth; }
 .stock-entry-item .size-lbl { font-size: 11px; font-weight: 700; color: var(--ink-soft); }
 .stock-entry-item input[type="number"] { width: 56px; text-align: center; padding: 7px 6px; font-size: 13px; }
 
+/* ===== Collapsible admin sections (mobile-safe) =====
+   Manual add-item form + each size chart + the WhatsApp Marketing section all
+   collapse into native <details>. CRITICAL: a <summary> with display:flex breaks
+   native <details> toggling in Safari / mobile WebKit, so summaries stay at
+   display:block (flex layout on inner wrappers) AND the toggles are JS-driven
+   (preventDefault + flip .open) — see admin.js. */
+
+/* -- manual add-item form: gold-pill toggle -- */
+.manual-entry { margin: 14px 0 0; }
+summary.manual-entry-divider {
+  display: block; list-style: none; cursor: pointer; user-select: none; margin: 10px 0;
+}
+summary.manual-entry-divider::-webkit-details-marker { display: none; }
+summary.manual-entry-divider::marker { content: ""; }
+.manual-entry .me-row { display: flex; align-items: center; gap: 12px; }
+.manual-entry .me-row::before, .manual-entry .me-row::after {
+  content: ""; flex: 1; height: 1px; background: var(--line);
+}
+.manual-entry .me-pill {
+  display: inline-flex; align-items: center; gap: 9px; white-space: nowrap;
+  background: var(--gold); color: var(--choco-deep);
+  padding: 12px 24px; border-radius: 999px;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  box-shadow: 0 3px 12px rgba(184,149,106,0.4);
+  transition: background 0.18s, transform 0.18s, box-shadow 0.18s;
+}
+.manual-entry .me-plus { transition: transform 0.2s ease; }
+.manual-entry[open] .me-plus { transform: rotate(45deg); }
+summary.manual-entry-divider:hover .me-pill {
+  background: var(--gold-deep); transform: translateY(-1px);
+  box-shadow: 0 5px 16px rgba(184,149,106,0.52);
+}
+summary.manual-entry-divider:active .me-pill { transform: translateY(0); }
+
+/* -- size-chart accordions -- */
+.stock-hint { font-size: 12.5px; color: var(--ink-soft); margin: 0 0 10px; line-height: 1.5; }
+.stock-details { border: 1px solid var(--line); border-radius: 9px; margin-bottom: 8px; background: #fff; overflow: hidden; }
+.stock-details[open] { border-color: rgba(184,149,106,0.5); }
+.stock-summary {
+  display: block; list-style: none; cursor: pointer; user-select: none; position: relative;
+  padding: 11px 38px 11px 14px; font-size: 13px; font-weight: 600; color: var(--ink);
+}
+.stock-summary::-webkit-details-marker { display: none; }
+.stock-summary::marker { content: ""; }
+.stock-summary small { font-weight: 400; color: #999; }
+.stock-summary::after {
+  content: "›"; position: absolute; right: 14px; top: 50%;
+  font-size: 18px; color: var(--gold-deep);
+  transform: translateY(-50%) rotate(90deg); transition: transform 0.18s ease;
+}
+.stock-details[open] .stock-summary::after { transform: translateY(-50%) rotate(-90deg); }
+.stock-summary:hover { background: rgba(184,149,106,0.06); }
+.stock-summary-count {
+  margin-left: 8px; font-size: 11px; font-weight: 700; color: var(--gold-deep);
+  background: rgba(184,149,106,0.16); border-radius: 999px; padding: 2px 9px;
+}
+.stock-summary-count:empty { display: none; }
+.stock-details .stock-entry-row { padding: 4px 14px 14px; }
+.stock-details .custom-size-rows { margin: 0 14px; }
+.stock-details #addCustomSizeBtn { margin: 0 14px 12px; }
+
+/* -- collapsible dashboard section (WhatsApp Marketing) -- */
+.dash-collapse { margin: 0; }
+summary.dash-summary {
+  display: block; list-style: none; cursor: pointer; user-select: none; position: relative;
+}
+summary.dash-summary::-webkit-details-marker { display: none; }
+summary.dash-summary::marker { content: ""; }
+summary.dash-summary .dash-title { margin-bottom: 0; padding-right: 28px; }
+.dash-collapse[open] summary.dash-summary .dash-title { margin-bottom: 18px; }
+summary.dash-summary::after {
+  content: "›"; position: absolute; right: 2px; top: 8px;
+  font-size: 24px; line-height: 1; color: var(--gold-deep);
+  transform: rotate(90deg); transition: transform 0.18s ease;
+}
+.dash-collapse[open] summary.dash-summary::after { transform: rotate(-90deg); }
+summary.dash-summary:hover .dash-title { color: var(--gold-deep); }
+
 /* Custom-size rows */
 .custom-size-rows { display: flex; flex-direction: column; gap: 6px; }
 .custom-size-row {

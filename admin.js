@@ -392,6 +392,8 @@ document.getElementById('igQuickBtn')?.addEventListener('click', async () => {
     }
 
     stagedInstagramUrl = data.postUrl;
+    const manualEntry = document.getElementById('manualEntry');
+    if (manualEntry) manualEntry.open = true;  // reveal the auto-filled fields
     status.textContent = '✓ Image and caption loaded. Review the name, category, price and stock, then Save.';
     status.className = 'ig-quick-status ok';
   } catch (err) {
@@ -442,12 +444,33 @@ function setStockToForm(stock) {
       });
     }
   }
+  // Auto-expand the size charts that hold stock (so editing shows them),
+  // collapse the empty ones, and refresh the "N set" badges.
+  refreshStockGroups(true);
 }
 
 function clearStockForm() {
   document.querySelectorAll('.stock-qty').forEach(inp => { inp.value = ''; });
   const customWrap = document.getElementById('customSizeRows');
   if (customWrap) customWrap.innerHTML = '';
+  refreshStockGroups(true);
+}
+
+// Count filled sizes per collapsible chart, badge it on the summary, and (when
+// collapseEmpty) open charts with stock + close the rest.
+function refreshStockGroups(collapseEmpty) {
+  document.querySelectorAll('.stock-details[data-stock-group]').forEach(det => {
+    let n = 0;
+    det.querySelectorAll('.stock-qty').forEach(inp => { if (parseInt(inp.value, 10) > 0) n++; });
+    det.querySelectorAll('.custom-size-row').forEach(row => {
+      const name = row.querySelector('.custom-size-name')?.value.trim();
+      const qty = parseInt(row.querySelector('.custom-size-qty')?.value, 10);
+      if (name && qty > 0) n++;
+    });
+    const badge = det.querySelector('.stock-summary-count');
+    if (badge) badge.textContent = n ? `${n} set` : '';
+    if (collapseEmpty) det.open = n > 0;
+  });
 }
 
 // ====== CUSTOM SIZE ROWS ======
@@ -461,10 +484,33 @@ function addCustomSizeRow(name = '', qty = '') {
     <input type="number" min="0" step="1" class="custom-size-qty" placeholder="Qty" value="${qty || ''}">
     <button type="button" class="btn-admin danger custom-size-remove" aria-label="Remove">×</button>
   `;
-  row.querySelector('.custom-size-remove').addEventListener('click', () => row.remove());
+  row.querySelector('.custom-size-remove').addEventListener('click', () => { row.remove(); refreshStockGroups(false); });
   wrap.appendChild(row);
 }
 document.getElementById('addCustomSizeBtn')?.addEventListener('click', () => addCustomSizeRow());
+
+// Live-update the "N set" badges as quantities are typed, without collapsing
+// the chart in use. Also drive each chart's toggle from JS (preventDefault +
+// flip .open) — .stock-summary is display:flex... actually block here, but the
+// JS toggle is the guaranteed mobile-safe path regardless. See CATALOG-STANDARDS.
+document.querySelectorAll('.stock-details[data-stock-group]').forEach(det => {
+  det.addEventListener('input', () => refreshStockGroups(false));
+  const sum = det.querySelector('summary');
+  if (sum) sum.addEventListener('click', (e) => { e.preventDefault(); det.open = !det.open; });
+});
+
+// ===== Mobile-safe collapsible toggles (manual form + WhatsApp Marketing) =====
+(function () {
+  const manualEntry = document.getElementById('manualEntry');
+  const manualSummary = document.getElementById('manualEntryDivider');
+  if (manualSummary) manualSummary.addEventListener('click', (e) => { e.preventDefault(); if (manualEntry) manualEntry.open = !manualEntry.open; });
+  document.querySelector('.admin-nav a[href="#addForm"]')?.addEventListener('click', () => { if (manualEntry) manualEntry.open = true; });
+
+  const broadcastCollapse = document.getElementById('broadcastCollapse');
+  const broadcastSummary = broadcastCollapse?.querySelector('summary.dash-summary');
+  if (broadcastSummary) broadcastSummary.addEventListener('click', (e) => { e.preventDefault(); broadcastCollapse.open = !broadcastCollapse.open; });
+  document.querySelector('.admin-nav a[href="#broadcastDash"]')?.addEventListener('click', () => { if (broadcastCollapse) broadcastCollapse.open = true; });
+})();
 
 // ====== AI DESCRIPTION ======
 document.getElementById('aiBtn').addEventListener('click', () => {
@@ -703,11 +749,14 @@ function resetForm() {
   if (igStatus) { igStatus.textContent = ''; igStatus.className = 'ig-quick-status'; }
   document.getElementById('formTitle').textContent = 'Add a new item';
   document.getElementById('cancelBtn').style.display = 'none';
-  // Restore the IG quick-add panel + divider (hidden during edit mode)
+  // Restore the IG quick-add panel + divider (hidden during edit mode) and
+  // re-collapse the manual fields to their default closed state.
   const igPanel = document.getElementById('igQuickPanel');
   const manualDivider = document.getElementById('manualEntryDivider');
+  const manualEntry = document.getElementById('manualEntry');
   if (igPanel) igPanel.style.display = '';
   if (manualDivider) manualDivider.style.display = '';
+  if (manualEntry) manualEntry.open = false;
 }
 
 function editItem(id) {
@@ -734,8 +783,10 @@ function editItem(id) {
   // on mobile, making it look like the Edit didn't work.
   const igPanel = document.getElementById('igQuickPanel');
   const manualDivider = document.getElementById('manualEntryDivider');
+  const manualEntry = document.getElementById('manualEntry');
   if (igPanel) igPanel.style.display = 'none';
   if (manualDivider) manualDivider.style.display = 'none';
+  if (manualEntry) manualEntry.open = true;  // edit hides the toggle, so .open reveals the fields
   // Scroll the form into view (instant — smooth-scroll over a long page adds a
   // confusing pause). Use the form title element so the "Edit item" h2 is at the top.
   document.getElementById('formTitle').scrollIntoView({ behavior: 'auto', block: 'start' });
