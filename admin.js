@@ -2454,6 +2454,48 @@ document.getElementById('insightsResetBtn')?.addEventListener('click', async () 
   showToast('Insights reset for the whole shop.');
 });
 
+/* ===== Daily report (WhatsApp) ===== */
+async function loadReportConfig() {
+  try {
+    const res = await fetch(`${API_BASE}/api/report-config`, { headers: { Authorization: `Bearer ${ADMIN_TOKEN}` } });
+    if (!res.ok) return;
+    const cfg = await res.json();
+    const p = document.getElementById('reportPhone'); if (p) p.value = cfg.phone || '';
+    const e = document.getElementById('reportEnabled'); if (e) e.checked = !!cfg.enabled;
+  } catch (_) {}
+}
+async function saveReportConfig() {
+  const phone = document.getElementById('reportPhone').value.trim();
+  const enabled = document.getElementById('reportEnabled').checked;
+  if (enabled && !phone) { showToast('Add your WhatsApp number first.'); return false; }
+  const res = await fetch(`${API_BASE}/api/report-config`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ADMIN_TOKEN}` },
+    body: JSON.stringify({ phone, enabled }),
+  });
+  return res.ok;
+}
+document.getElementById('reportSaveBtn')?.addEventListener('click', async () => {
+  if (accountSuspended) { showToast(SUSPENDED_MSG); return; }
+  const status = document.getElementById('reportStatus');
+  if (await saveReportConfig()) { status.textContent = '✓ Saved.'; showToast('Daily report settings saved.'); }
+  else status.textContent = '✗ Could not save. Try again.';
+});
+document.getElementById('reportTestBtn')?.addEventListener('click', async () => {
+  if (accountSuspended) { showToast(SUSPENDED_MSG); return; }
+  const status = document.getElementById('reportStatus');
+  const phone = document.getElementById('reportPhone').value.trim();
+  if (!phone) { showToast('Add your WhatsApp number first.'); return; }
+  status.textContent = 'Saving and sending a test…';
+  await saveReportConfig();
+  try {
+    const res = await fetch(`${API_BASE}/api/report-test`, { method: 'POST', headers: { Authorization: `Bearer ${ADMIN_TOKEN}` } });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) status.textContent = '✓ Sent. Check your WhatsApp.';
+    else status.textContent = '✗ ' + (data.error || data.skipped || 'Could not send. Check the number and try again.');
+  } catch (_) { status.textContent = '✗ Could not reach the server.'; }
+});
+
 // Admin item search — debounced
 const adminItemSearchInput = document.getElementById('adminItemSearch');
 let adminSearchTimer;
@@ -2611,6 +2653,7 @@ async function init() {
   renderClients();
   renderOwed();
   renderInsights();
+  loadReportConfig();
   initNavScrollSpy();
 }
 

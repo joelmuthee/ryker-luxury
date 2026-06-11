@@ -12,5 +12,11 @@ id = "3d298b091a304e208674360285820c8f"
 [ai]
 binding = "AI"
 
-# Auth token set as a secret — never committed:
+# Daily closing report — fires 17:00 UTC = 20:00 EAT (8pm Nairobi).
+# The scheduled() handler no-ops unless the owner enabled it + set a phone.
+[triggers]
+crons = ["0 17 * * *"]
+
+# Secrets — never committed:
 #   npx wrangler secret put ADMIN_TOKEN
+#   npx wrangler secret put WASENDER_TOKEN   (for the daily WhatsApp report)

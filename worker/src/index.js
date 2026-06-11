@@ -555,7 +555,101 @@ function coerceCategory(c) {
   return null;
 }
 
+// ---- Daily closing report (WhatsApp via WaSender) ----
+// Once a day the scheduled() cron reads the day's sales + insights from KV,
+// builds a plain-language summary, and WhatsApps it to the owner. Config lives
+// in its OWN KV key "reportcfg" = { phone, enabled } — never in "data" (which
+// is public via /api/bags). WaSender token is a worker secret WASENDER_TOKEN.
+const SHOP_NAME = "Ryker Luxury";              // per-fork: shop's display name
+const EAT_OFFSET_MS = 3 * 60 * 60 * 1000;      // Africa/Nairobi = UTC+3, no DST
+
+// EAT calendar date (YYYY-MM-DD) for an epoch-ms instant
+const eatDateKey = (ms) => new Date(ms + EAT_OFFSET_MS).toISOString().slice(0, 10);
+const fmtKshReport = (n) => "Ksh " + Number(n || 0).toLocaleString("en-US");
+
+// WaSender wants a bare MSISDN. Storage may be 07.., 7.., +254.., 254..
+function waNormPhone(p) {
+  let d = String(p || "").replace(/\D/g, "");
+  if (d.startsWith("0")) d = "254" + d.slice(1);
+  else if (d.startsWith("7") || d.startsWith("1")) d = "254" + d;
+  return d;
+}
+
+// Build the owner's report text for "today" (EAT) from the data + stats blobs.
+function buildDailyReport(data, stats, nowMs) {
+  const today = eatDateKey(nowMs);
+  const bags = Array.isArray(data.bags) ? data.bags : [];
+  let count = 0, units = 0, revenue = 0, cash = 0, mpesa = 0;
+  const perItem = {};
+  for (const b of bags) {
+    for (const s of (b.sales || [])) {
+      if (!s || !s.soldAt || eatDateKey(Date.parse(s.soldAt)) !== today) continue;
+      const qty = Number(s.qty) || 1;
+      const amt = (Number(s.salePrice) || 0) * qty;
+      count++; units += qty; revenue += amt;
+      if (s.paymentMethod === "mpesa") mpesa += amt; else cash += amt;
+      perItem[b.name] = (perItem[b.name] || 0) + qty;
+    }
+  }
+  const low = [];
+  for (const b of bags) {
+    const st = b.stock && typeof b.stock === "object" ? b.stock : null;
+    if (!st || !Object.keys(st).length) continue;
+    const total = Object.values(st).reduce((a, n) => a + (Number(n) || 0), 0);
+    if (total >= 1 && total <= 3) low.push(`${b.name} (${total} left)`);
+  }
+  const topItems = Object.entries(perItem).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([n, q]) => `${n} x${q}`);
+  const noRes = (stats && stats.searchNoResults) || {};
+  const wanted = Object.entries(noRes).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => k);
+
+  const L = [`*${SHOP_NAME} — today's report*`, today, ""];
+  if (count === 0) {
+    L.push("No sales recorded today yet.");
+  } else {
+    L.push(`🧾 ${count} ${count === 1 ? "sale" : "sales"} · ${units} ${units === 1 ? "item" : "items"}`);
+    L.push(`💰 ${fmtKshReport(revenue)}`);
+    L.push(`   💵 Cash ${fmtKshReport(cash)} · 📱 M-Pesa ${fmtKshReport(mpesa)}`);
+    if (topItems.length) L.push(`🔥 Top: ${topItems.join(", ")}`);
+  }
+  if (low.length) { L.push(""); L.push(`📦 Low stock: ${low.slice(0, 5).join(", ")}`); }
+  if (wanted.length) { L.push(""); L.push(`🔎 Searched but not found: ${wanted.join(", ")}`); }
+  return L.join("\n");
+}
+
+async function sendViaWaSender(env, phone, text) {
+  const token = (env.WASENDER_TOKEN || "").trim();
+  if (!token) return { ok: false, error: "WASENDER_TOKEN not set" };
+  const to = waNormPhone(phone);
+  if (!to) return { ok: false, error: "no phone" };
+  try {
+    const r = await fetch("https://wasenderapi.com/api/send-message", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+      body: JSON.stringify({ to, text }),
+    });
+    const body = await r.text().catch(() => "");
+    return { ok: r.ok, status: r.status, body: body.slice(0, 300) };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+async function runDailyReport(env, force) {
+  let cfg;
+  try { cfg = JSON.parse(await env.BAGS.get("reportcfg")) || {}; } catch { cfg = {}; }
+  if (!force && !cfg.enabled) return { ok: false, skipped: "disabled" };
+  if (!cfg.phone) return { ok: false, skipped: "no phone" };
+  let data, stats;
+  try { data = JSON.parse(await env.BAGS.get("data")) || {}; } catch { data = {}; }
+  try { stats = JSON.parse(await env.BAGS.get("stats")) || {}; } catch { stats = {}; }
+  return await sendViaWaSender(env, cfg.phone, buildDailyReport(data, stats, Date.now()));
+}
+
 export default {
+  // Cloudflare Cron Trigger (see wrangler.toml [triggers]). Fires 17:00 UTC =
+  // 20:00 EAT. No-ops unless the owner has enabled the report + set a phone.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runDailyReport(env, false));
+  },
+
   async fetch(request, env) {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
 
@@ -767,6 +861,31 @@ export default {
       const blocked = await suspendBlock(request, env); if (blocked) return blocked;
       await env.BAGS.put("stats", JSON.stringify({ _lastUpdated: new Date().toISOString() }));
       return json({ ok: true });
+    }
+
+    // Daily report config — owner sets their phone + on/off. Stored in its own
+    // KV key (NOT "data"), so it's never exposed by the public /api/bags.
+    if (path === "/api/report-config") {
+      if (!isAuthed(request, env)) return json({ error: "unauthorized" }, 401);
+      if (request.method === "GET") {
+        let cfg; try { cfg = JSON.parse(await env.BAGS.get("reportcfg")) || {}; } catch { cfg = {}; }
+        return json({ phone: cfg.phone || "", enabled: !!cfg.enabled });
+      }
+      if (request.method === "POST") {
+        const blocked = await suspendBlock(request, env); if (blocked) return blocked;
+        let body; try { body = await request.json(); } catch { return json({ error: "invalid json" }, 400); }
+        const cfg = { phone: String(body.phone || "").trim(), enabled: !!body.enabled };
+        await env.BAGS.put("reportcfg", JSON.stringify(cfg));
+        return json({ ok: true, ...cfg });
+      }
+    }
+
+    // Owner-triggered "send a test report right now" (also used to preview copy).
+    if (request.method === "POST" && path === "/api/report-test") {
+      if (!isAuthed(request, env)) return json({ error: "unauthorized" }, 401);
+      const blocked = await suspendBlock(request, env); if (blocked) return blocked;
+      const res = await runDailyReport(env, true);
+      return json(res, res.ok ? 200 : 400);
     }
 
     // Admin: replace all data

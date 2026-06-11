@@ -84,6 +84,7 @@
     <a href="#clientsDash" id="clientsNavLink">Clients <span class="admin-nav-count" id="navClientsCount"></span><span class="admin-nav-new" id="clientsNavNew">NEW</span></a>
     <a href="#owedDash" id="owedNavLink">Owed <span class="admin-nav-count" id="navOwedCount"></span><span class="admin-nav-new" id="owedNavNew">NEW</span></a>
     <a href="#insightsDash">Insights</a>
+    <a href="#reportDash">Daily report</a>
     <a href="#allItems">All items <span class="admin-nav-count" id="navItemCount"></span></a>
   </nav>
 
@@ -288,6 +289,25 @@
       <div id="insightsSearchGaps"></div>
     </div>
     <button class="btn-admin" id="insightsResetBtn" style="margin-top:14px;font-size:12px;">Reset insights</button>
+  </section>
+
+  <!-- ====== DAILY REPORT ====== -->
+  <section class="dash" id="reportDash">
+    <h2 class="dash-title">Daily report <small style="font-family:var(--sans);font-size:11px;font-weight:500;letter-spacing:0.08em;color:var(--ink-faint);text-transform:uppercase;margin-left:6px;">WhatsApp · every evening</small></h2>
+    <p style="font-size:13px;color:var(--ink-soft);margin:-8px 0 16px;">Get a short WhatsApp every night at 8pm with the day's takings, the cash and M-Pesa split, your top sellers, low stock, and what people searched for but couldn't find. Put your WhatsApp number, switch it on, and send yourself a test to see it.</p>
+    <div style="display:flex;flex-direction:column;gap:12px;max-width:420px;">
+      <label style="font-size:13px;font-weight:600;">Your WhatsApp number
+        <input type="tel" id="reportPhone" placeholder="0712 345 678" style="width:100%;margin-top:6px;padding:11px 13px;border:1px solid var(--line);border-radius:10px;font-size:15px;">
+      </label>
+      <label style="display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600;cursor:pointer;">
+        <input type="checkbox" id="reportEnabled" style="width:18px;height:18px;"> Send me the report every evening
+      </label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn-admin" id="reportSaveBtn">Save</button>
+        <button class="btn-admin" id="reportTestBtn" style="background:#25d366;color:#fff;">Send me a test now</button>
+      </div>
+      <div id="reportStatus" style="font-size:13px;color:var(--ink-soft);min-height:18px;"></div>
+    </div>
   </section>
 
   <!-- ====== ADD / EDIT ITEM ====== -->
