@@ -172,7 +172,7 @@ function renderSuspendedBanner() {
 
 // ====== HELPERS ======
 const toast = document.getElementById('toast');
-function showToast(msg) { toast.textContent = msg; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2800); }
+function showToast(msg, ms) { toast.textContent = msg; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), ms || 2800); }
 
 // In-page confirm. Native confirm() returns false without showing in in-app
 // webviews (WhatsApp/Instagram browser) and after Chrome's "block additional
@@ -1640,7 +1640,7 @@ function roundTo50(n) { return Math.max(50, Math.round(n / 50) * 50); }
 // false — the buttons stay visible but tapping shows an upsell toast (no sale applied).
 const SALE_ENABLED = true;
 window.bulkPutOnSale = () => {
-  if (!SALE_ENABLED) { showToast('Putting items on sale is part of the Shop Records plan. Message us to add it to your shop.'); return; }
+  if (!SALE_ENABLED) { showToast('Putting items on sale is part of the Shop Records plan. Message us to add it to your shop.', 6500); return; }
   if (!bulkSelected.size) return;
   document.getElementById('bulkSaleCount').textContent = bulkSelected.size;
   document.getElementById('bulkSalePct').value = '';
@@ -1686,7 +1686,7 @@ document.getElementById('bulkSaleSaveBtn')?.addEventListener('click', async () =
 });
 
 window.bulkRemoveSale = async () => {
-  if (!SALE_ENABLED) { showToast('Putting items on sale is part of the Shop Records plan. Message us to add it to your shop.'); return; }
+  if (!SALE_ENABLED) { showToast('Putting items on sale is part of the Shop Records plan. Message us to add it to your shop.', 6500); return; }
   if (!bulkSelected.size) return;
   const ids = new Set(bulkSelected);
   let n = 0;
