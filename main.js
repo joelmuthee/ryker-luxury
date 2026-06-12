@@ -379,7 +379,13 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     if (currentSort === 'newest')      filtered.sort((a, b) => itemTimestamp(b) - itemTimestamp(a));
     else if (currentSort === 'priceAsc')  filtered.sort((a, b) => effectivePrice(a) - effectivePrice(b));
     else if (currentSort === 'priceDesc') filtered.sort((a, b) => effectivePrice(b) - effectivePrice(a));
-    // 'default' keeps IG feed order (the natural array order)
+    else {
+      // 'default' keeps IG feed order (the natural array order), EXCEPT
+      // admin-boosted items float to the top (most recently boosted first).
+      // Sold-out items never float — boost is for moving slow stock.
+      const boostRank = it => (!isSoldOut(it) && it.boostedAt) ? new Date(it.boostedAt).getTime() : 0;
+      filtered.sort((a, b) => boostRank(b) - boostRank(a));
+    }
 
     const availCount = items.filter(i => !isSoldOut(i)).length;
     const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));

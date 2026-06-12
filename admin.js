@@ -1406,7 +1406,7 @@ function renderList() {
           (bag.salePrice > 0 && bag.salePrice < bag.price)
             ? `<s style="color:#999;font-weight:400;">${fmtKsh(bag.price)}</s> <span style="color:#c0392b;font-weight:700;">${fmtKsh(bag.salePrice)}</span> <span style="color:#c0392b;font-weight:700;">· SALE</span>`
             : fmtKsh(bag.price)
-        }<span class="admin-card-mobile-stock"> · ${units} in stock</span></div>
+        }<span class="admin-card-mobile-stock"> · ${units} in stock</span>${(!isSoldOut(bag) && bag.boostedAt) ? ' · <span style="color:#8a6d3b;font-weight:700;">⬆ BOOSTED</span>' : ''}</div>
         <div class="admin-card-stock">${units} in stock · ${sold} sold | ${stockSummary}</div>
         ${addedIso ? `<div class="admin-card-added" title="Added ${new Date(addedIso).toLocaleString('en-KE')}">Added ${relTime(addedIso)}</div>` : ''}
         <div class="admin-card-actions">
@@ -1691,6 +1691,42 @@ window.bulkRemoveSale = async () => {
     bulkSelected.clear();
     renderList(); renderInventory(); renderDashboard();
     showToast(`Removed sale from ${n} item${n === 1 ? '' : 's'}.`);
+  } catch (err) { showToast(err.message.startsWith('None of') ? err.message : 'Sync failed: ' + err.message); }
+};
+
+// ---- Boost to top ----
+// Floats selected items to the top of the default Featured order on the public
+// site. Used for moving slow / old stock. Most recently boosted first. Sold-out
+// items (computed: stock all-zero + ≥1 sale) cannot be boosted.
+window.bulkBoost = async () => {
+  if (!bulkSelected.size) return;
+  const ids = new Set(bulkSelected);
+  let n = 0;
+  try {
+    await apiMutateAndPublish(() => {
+      n = 0;
+      bags.forEach(b => { if (ids.has(b.id) && !isSoldOut(b)) { b.boostedAt = new Date().toISOString(); n++; } });
+      if (!n) throw new Error('No items boosted — sold-out items cannot be boosted.');
+    });
+    bulkSelected.clear();
+    renderList(); renderInventory(); renderDashboard();
+    showToast(`Boosted ${n} item${n === 1 ? '' : 's'} to the top of the shop.`);
+  } catch (err) { showToast(err.message.startsWith('No items') ? err.message : 'Sync failed: ' + err.message); }
+};
+
+window.bulkRemoveBoost = async () => {
+  if (!bulkSelected.size) return;
+  const ids = new Set(bulkSelected);
+  let n = 0;
+  try {
+    await apiMutateAndPublish(() => {
+      n = 0;
+      bags.forEach(b => { if (ids.has(b.id) && b.boostedAt) { delete b.boostedAt; n++; } });
+      if (!n) throw new Error('None of the selected items were boosted.');
+    });
+    bulkSelected.clear();
+    renderList(); renderInventory(); renderDashboard();
+    showToast(`Removed boost from ${n} item${n === 1 ? '' : 's'}.`);
   } catch (err) { showToast(err.message.startsWith('None of') ? err.message : 'Sync failed: ' + err.message); }
 };
 
