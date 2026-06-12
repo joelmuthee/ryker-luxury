@@ -647,14 +647,15 @@ async function runDailyReport(env, force) {
 // Same pipeline as the admin's "Check for new posts" widget, minus the human
 // review step: fetch the feed, AI-classify (heuristic + vision + text), parse
 // name/category/sizes from the caption, download the cover image into KV,
-// prepend to the catalog. Runs every morning so new IG posts appear on the
-// site by themselves; the owner can still edit/delete from the admin.
+// prepend to the catalog. Runs twice a day (afternoon + evening waves — owners
+// post during the day, so a morning-only sync would mostly catch yesterday's
+// posts); the owner can still edit/delete from the admin.
 // 3k+ tier feature (owner directive 2026-06-12). Cap 20/run on Workers Paid
 // (~112 of ~1,000 subrequests) — the cap keeps IG fetch volume gentle.
 // Kill switch: KV key `autosync` = {"enabled":false}. Suspended shops skip.
-// Stagger slot: 06:10 UTC (Iman holds 06:00, ThriftLux 06:20) — IG rate-limits
-// by source IP and the fleet shares Cloudflare egress IPs, so shops must not
-// all fetch at the same second.
+// Stagger offset: :10 past the wave hour (Iman holds :00 [disabled],
+// ThriftLux :20) — IG rate-limits by source IP and the fleet shares
+// Cloudflare egress IPs, so shops must not all fetch at the same second.
 const IG_AUTOSYNC_USER_ID = "47659611317"; // @rykerluxury
 const API_ORIGIN = "https://rykerluxury-api.stawisystems.workers.dev";
 const AUTOSYNC_MAX_ITEMS = 20;
@@ -749,14 +750,14 @@ async function runIgAutoSync(env) {
 
 export default {
   // Cloudflare Cron Triggers (see wrangler.toml [triggers]).
-  //   "10 6 * * *" = 09:10 EAT → IG auto-sync (new posts add themselves)
-  //   "0 17 * * *" = 20:00 EAT → daily WhatsApp report (no-ops unless enabled)
+  //   "0 17 * * *" (20:00 EAT) → daily WhatsApp report (no-ops unless enabled)
+  //   any other cron → IG auto-sync (afternoon + evening waves)
   async scheduled(event, env, ctx) {
-    if (event.cron === "10 6 * * *") {
-      ctx.waitUntil(runIgAutoSync(env));
+    if (event.cron === "0 17 * * *") {
+      ctx.waitUntil(runDailyReport(env, false));
       return;
     }
-    ctx.waitUntil(runDailyReport(env, false));
+    ctx.waitUntil(runIgAutoSync(env));
   },
 
   async fetch(request, env) {
