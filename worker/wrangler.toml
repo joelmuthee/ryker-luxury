@@ -12,10 +12,12 @@ id = "3d298b091a304e208674360285820c8f"
 [ai]
 binding = "AI"
 
-# Daily closing report — fires 17:00 UTC = 20:00 EAT (8pm Nairobi).
-# The scheduled() handler no-ops unless the owner enabled it + set a phone.
+# Two crons, dispatched by event.cron in scheduled():
+#   "10 6 * * *" → 09:10 EAT: IG auto-sync (Ryker's fleet stagger slot; Iman
+#                  holds 06:00 [disabled], ThriftLux 06:20)
+#   "0 17 * * *" → 20:00 EAT: daily WhatsApp report (no-ops unless owner enabled it)
 [triggers]
-crons = ["0 17 * * *"]
+crons = ["10 6 * * *", "0 17 * * *"]
 
 # Secrets — never committed:
 #   npx wrangler secret put ADMIN_TOKEN
