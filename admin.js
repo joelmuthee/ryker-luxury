@@ -3,6 +3,9 @@ const ADMIN_PASSWORD = 'ryker123';
 const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
 const ADMIN_TOKEN = atob('cnlrZXItYWRtaW4tdG9rZW4tMjAyNi1zZWN1cmU=');
 const SHOP_URL = 'https://rykerluxury.co.ke'; // public storefront — used in WhatsApp messages to clients
+// Tier gate: Boost-to-top is a 3k Shop Records-and-up feature. Set false on a
+// one-off Shopfront build to hide the boost bulk-bar buttons. Default true.
+const BOOST_ENABLED = true;
 
 let bags = [];
 let settings = {};
@@ -1699,6 +1702,7 @@ window.bulkRemoveSale = async () => {
 // site. Used for moving slow / old stock. Most recently boosted first. Sold-out
 // items (computed: stock all-zero + ≥1 sale) cannot be boosted.
 window.bulkBoost = async () => {
+  if (!BOOST_ENABLED) return;
   if (!bulkSelected.size) return;
   const ids = new Set(bulkSelected);
   let n = 0;
@@ -1715,6 +1719,7 @@ window.bulkBoost = async () => {
 };
 
 window.bulkRemoveBoost = async () => {
+  if (!BOOST_ENABLED) return;
   if (!bulkSelected.size) return;
   const ids = new Set(bulkSelected);
   let n = 0;
@@ -2741,6 +2746,8 @@ async function init() {
   renderOwed();
   renderInsights();
   loadReportConfig();
+  // Tier gate: hide the Boost-to-top bulk buttons on a one-off Shopfront build.
+  if (!BOOST_ENABLED) document.querySelectorAll('.boost-ctrl').forEach(b => b.style.display = 'none');
   initNavScrollSpy();
 }
 
