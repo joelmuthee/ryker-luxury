@@ -13,13 +13,14 @@ id = "3d298b091a304e208674360285820c8f"
 binding = "AI"
 
 # Crons, dispatched by event.cron in scheduled():
+#   "10 6 * * *"  →  9:10 EAT: IG auto-sync, morning wave (owner ask 2026-06-17:
+#                   thrice a day — morning + afternoon + evening)
 #   "10 10 * * *" → 13:10 EAT: IG auto-sync, afternoon wave (Ryker's stagger
 #                   offset is :10; Iman holds :00 [disabled], ThriftLux :20)
-#   "10 16 * * *" → 19:10 EAT: IG auto-sync, evening wave (owner ask 2026-06-12:
-#                   twice a day, afternoon + evening — owners post during the day)
+#   "10 16 * * *" → 19:10 EAT: IG auto-sync, evening wave
 #   "0 17 * * *"  → 20:00 EAT: daily WhatsApp report (no-ops unless owner enabled it)
 [triggers]
-crons = ["10 10 * * *", "10 16 * * *", "0 17 * * *"]
+crons = ["10 6 * * *", "10 10 * * *", "10 16 * * *", "0 17 * * *"]
 
 # Secrets — never committed:
 #   npx wrangler secret put ADMIN_TOKEN

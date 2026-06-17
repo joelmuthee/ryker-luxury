@@ -388,9 +388,25 @@ document.getElementById('igQuickBtn')?.addEventListener('click', async () => {
       renderExtraImagesPreview();
     }
 
-    // Auto-fill description from caption (strip the "username" prefix some IG embeds add)
+    // Auto-fill description from caption (strip the "username" prefix some IG embeds add).
+    // Keep the descriptive text but drop the price (it has its own field), contact
+    // tail, hashtags and SOLD flag. Em/en dashes → commas (copy standard).
     const cap = (data.caption || '').replace(/^[a-z0-9._]+\s+/i, '').trim();
-    document.getElementById('descInput').value = cap;
+    const desc = cap
+      .split(/whastup|whatsapp|wa\.me|dm to order|dm to buy|inbox|order now|0\d{8,9}|\+?254\d{6,}/i)[0]
+      .replace(/#[^\s#]+/g, '')
+      .replace(/\d[\d,]*(?:\.\d+)?\s*\/[=\-]/g, '')
+      .replace(/(?:ksh?s?\.?|kes)\s*\.?\s*\d[\d,]*(?:\.\d+)?\s*k?\b/gi, '')
+      .replace(/@\s*\d[\d,]*(?:\.\d+)?\s*k?\b/gi, '')
+      .replace(/\s*\/[=\-]/g, '')
+      .replace(/\s*@(?!\w)/g, '')
+      .replace(/\bsold(?:\s*out)?\b/gi, '')
+      .replace(/\s*[—–]\s*/g, ', ')
+      .replace(/\s+([.,!?])/g, '$1')
+      .replace(/\s{2,}/g, ' ')
+      .replace(/^[\s.,\-:;]+|[\s.,\-:;]+$/g, '')
+      .trim();
+    document.getElementById('descInput').value = desc;
 
     // Suggest a name from the first sentence
     if (!document.getElementById('nameInput').value && cap) {
@@ -2208,6 +2224,15 @@ function pastBuyers() {
       else if (!e.name && s.buyerName) e.name = s.buyerName;
     }
   }
+  // Manually-added clients with a phone are also broadcast recipients. They have
+  // no purchase to segment by, so they only match an unsegmented (Any/Any) blast.
+  for (const c of (Array.isArray(clients) ? clients : [])) {
+    const phone = String(c.phone || '').replace(/[^0-9]/g, '');
+    if (phone.length < 9) continue;
+    const e = map.get(phone);
+    if (e) { if (!e.name && c.name) e.name = c.name; continue; }
+    map.set(phone, { phone, name: c.name || '', soldAt: new Date(c.createdAt || 0).getTime(), lastBought: '', buys: [] });
+  }
   return [...map.values()].sort((a, b) => b.soldAt - a.soldAt);
 }
 
@@ -2225,7 +2250,11 @@ function broadcastSortSizes(arr) {
   });
 }
 function buyerMatchesFilter(b) {
-  return (b.buys || []).some(x =>
+  const buys = b.buys || [];
+  // No purchase history (a manually-added contact) → only reachable in an
+  // unsegmented broadcast; we can't claim they bought a given category/size.
+  if (!buys.length) return broadcastFilterCat === 'all' && broadcastFilterSize === 'all';
+  return buys.some(x =>
     (broadcastFilterCat === 'all' || x.cat === broadcastFilterCat) &&
     (broadcastFilterSize === 'all' || x.size === broadcastFilterSize));
 }
@@ -2331,7 +2360,7 @@ function renderBroadcastRecipients() {
     matchEl.textContent = `${buyers.length} ${buyers.length === 1 ? 'buyer' : 'buyers'}${seg === 'all buyers' ? '' : ' · ' + seg}`;
   }
   if (!all.length) {
-    wrap.innerHTML = '<p style="color:var(--ink-faint);font-size:13px;padding:8px 0;">No past buyers yet — once you record sales with buyer phones, they\'ll show up here.</p>';
+    wrap.innerHTML = '<p style="color:var(--ink-faint);font-size:13px;padding:8px 0;">No one to message yet. Record a sale with a buyer phone, or add a client with a phone in Clients below, and they\'ll show up here.</p>';
     return;
   }
   if (!buyers.length) {
@@ -2351,7 +2380,7 @@ function renderBroadcastRecipients() {
           <input type="checkbox" data-bc-toggle="${b.phone}" ${st.included ? 'checked' : ''}>
           <span class="broadcast-recipient-name">${escapeHtml(b.name || 'Unknown buyer')}</span>
           <span class="broadcast-recipient-phone">+${b.phone}</span>
-          <span class="broadcast-recipient-meta">last: ${escapeHtml(b.lastBought)}</span>
+          <span class="broadcast-recipient-meta">${b.lastBought ? 'last: ' + escapeHtml(b.lastBought) : 'added as a contact'}</span>
         </label>`;
     }).join('')}
   `;

@@ -198,6 +198,80 @@ function deriveBrand(caption) {
 // Ryker is NEW-STOCK — captions like "Sizes M, L, XL" or "S/M/L/XL" mean the
 // owner has stock in each of those sizes. Default qty=1 per detected size;
 // owner adjusts in admin. Returns { name, category, stock: { sz: qty }, description }.
+// Pull a price out of a caption — ONLY when it's unambiguous, so the auto-sync
+// never puts a WRONG number on the live shop. We trust a number only if it sits
+// next to a money marker (Ksh / KES / @ / trailing /= /-) or a "k" thousands
+// suffix, or after price/bei/now. A bare number with no marker (could be a size,
+// phone, quantity) is ignored — those posts land blank ("Price on request"),
+// which is the ONLY time we show no price (owner's rule, 2026-06-16). Returns an
+// integer KES amount, or 0 when the caption carries no clear price.
+function parsePriceFromCaption(caption) {
+  const text = (caption || "").replace(/\s+/g, " ").trim();
+  if (!text) return 0;
+  const cands = [];
+  const push = (raw, mult, index) => {
+    if (raw == null) return;
+    const n = Math.round(parseFloat(String(raw).replace(/,/g, "")) * (mult || 1));
+    // Sane Nairobi fashion range — rejects misread sizes/quantities/years.
+    if (Number.isFinite(n) && n >= 100 && n <= 1000000) cands.push({ n, index });
+  };
+  let m, re;
+  // Ksh / Kshs / KES + number (+ optional k)
+  re = /(?:ksh?s?|kes)\s*\.?\s*([\d,]+(?:\.\d+)?)\s*(k)?/gi;
+  while ((m = re.exec(text))) push(m[1], m[2] ? 1000 : 1, m.index);
+  // @ + number (+ optional k) — "@1200", "@1.2k"
+  re = /@\s*([\d,]+(?:\.\d+)?)\s*(k)?/gi;
+  while ((m = re.exec(text))) push(m[1], m[2] ? 1000 : 1, m.index);
+  // number + trailing /= or /-  — "1800/=", "1,500/-"
+  re = /([\d,]+(?:\.\d+)?)\s*\/[=\-]/gi;
+  while ((m = re.exec(text))) push(m[1], 1, m.index);
+  // price/bei/now/going for + number
+  re = /(?:price|bei|now|going for)\s*:?\s*(?:ksh?s?\s*)?([\d,]+(?:\.\d+)?)\s*(k)?/gi;
+  while ((m = re.exec(text))) push(m[1], m[2] ? 1000 : 1, m.index);
+  // standalone thousands suffix — "1.8k", "15k" — unless right after a size word
+  re = /(?:^|[^a-z0-9.])(\d{1,3}(?:\.\d+)?)\s*k\b/gi;
+  while ((m = re.exec(text))) {
+    const before = text.slice(Math.max(0, m.index - 6), m.index).toLowerCase();
+    if (/siz|sz/.test(before)) continue;
+    push(m[1], 1000, m.index);
+  }
+  if (!cands.length) return 0;
+  // First clearly-marked price by position — captions state the price once;
+  // the owner edits the rare "was X now Y" case in admin.
+  cands.sort((a, b) => a.index - b.index);
+  return cands[0].n;
+}
+
+// Build a public product description from an IG caption. Keep the descriptive
+// text the owner wrote, but strip the parts that don't belong on the storefront:
+// hashtags, the price (it has its own field — prices must NOT appear in the
+// description), contact/CTA tails, and SOLD flags. Em/en dashes go to commas per
+// the copy standard. Falls back to the canned line when nothing useful survives.
+// Do NOT strip a leading word as an "IG handle" here — feed-API captions have no
+// handle prefix, so that strip eats the first real product word.
+const DEFAULT_DESC = "Premium menswear, hand-selected. Photographed exactly as it is. Pick your size below to enquire.";
+function captionToDescription(caption) {
+  let t = (caption || "").replace(/\r/g, "").trim();
+  if (!t) return DEFAULT_DESC;
+  t = t.split(/whastup|whatsapp|wa\.me|dm to order|dm to buy|inbox|order now|0\d{8,9}|\+?254\d{6,}/i)[0];
+  t = t
+    .replace(/#[^\s#]+/g, "")
+    .replace(/\d[\d,]*(?:\.\d+)?\s*\/[=\-]/g, "")                      // 4500/= 4500/-
+    .replace(/(?:ksh?s?\.?|kes)\s*\.?\s*\d[\d,]*(?:\.\d+)?\s*k?\b/gi, "") // Ksh 4500 / KES4500
+    .replace(/@\s*\d[\d,]*(?:\.\d+)?\s*k?\b/gi, "")                    // @4500
+    .replace(/\b(?:price|bei|now|going for)\s*:?\s*(?:ksh?s?\s*)?\d[\d,]*\s*k?\b/gi, "")
+    .replace(/\s*\/[=\-]/g, "")                                        // orphan /= /-
+    .replace(/\s*@(?!\w)/g, "")                                        // orphan @
+    .replace(/\bsold(?:\s*out)?\b/gi, "")
+    .replace(/\s*[—–]\s*/g, ", ")
+    .replace(/[•|]+/g, " ")
+    .replace(/\s+([.,!?])/g, "$1")
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[\s.,\-:;]+|[\s.,\-:;]+$/g, "")
+    .trim();
+  return t.length >= 8 ? t : DEFAULT_DESC;
+}
+
 function parseCaptionForBag(caption) {
   const text = (caption || "").trim();
   const lower = text.toLowerCase();
@@ -264,7 +338,8 @@ function parseCaptionForBag(caption) {
     name: brand,
     category: category || null,
     stock,
-    description: "Premium menswear, hand-selected. Photographed exactly as it is. Pick your size below to enquire.",
+    price: parsePriceFromCaption(caption),
+    description: captionToDescription(caption),
   };
 }
 
@@ -669,13 +744,18 @@ async function runIgAutoSync(env) {
   const existingRaw = await env.BAGS.get("data");
   const data = existingRaw ? JSON.parse(existingRaw) : { bags: [], settings: {} };
   const existingIds = new Set((data.bags || []).map(b => b.id));
+  // Permanent "already pulled" ledger — the tombstone the in-catalog check can't
+  // be. An item synced once stays here even after the owner DELETES it, so the
+  // cron never resurrects deleted items (the bug Joyce hit twice, 2026-06-16).
+  const ledgerRaw = await env.BAGS.get("ig_synced_codes");
+  const syncedCodes = new Set(ledgerRaw ? JSON.parse(ledgerRaw) : []);
 
   const feed = await fetchIgFeed({ userId: IG_AUTOSYNC_USER_ID, count: 24 });
   if (!feed.items) return { ok: false, error: feed.error || "feed empty" };
 
   // A few extra candidates beyond the cap so non-product posts don't eat the run.
   const fresh = feed.items
-    .filter(it => it.imageUrl && it.shortcode && !existingIds.has(`ig_${it.shortcode}`))
+    .filter(it => it.imageUrl && it.shortcode && !existingIds.has(`ig_${it.shortcode}`) && !syncedCodes.has(it.shortcode))
     .slice(0, AUTOSYNC_MAX_ITEMS + 3);
 
   const newBags = [];
@@ -726,7 +806,7 @@ async function runIgAutoSync(env) {
         name: (name || "New Item").slice(0, 80),
         category,
         description: sug.description,
-        price: 0,
+        price: sug.price || 0, // parsed from caption; 0 (blank) only when no price posted
         stock,
         sales: [],
         image: `${API_ORIGIN}/img/${fname}`,
@@ -744,6 +824,9 @@ async function runIgAutoSync(env) {
   if (newBags.length) {
     data.bags = newBags.concat(data.bags);
     await env.BAGS.put("data", JSON.stringify(data));
+    // Tombstone every committed shortcode so deleting it later can't bring it back.
+    for (const b of newBags) syncedCodes.add(b.id.slice(3));
+    await env.BAGS.put("ig_synced_codes", JSON.stringify([...syncedCodes]));
   }
   return { ok: true, added: newBags.length, names: newBags.map(b => b.name), skipped };
 }
@@ -1254,11 +1337,15 @@ export default {
         const existingRaw = await env.BAGS.get("data");
         const existing = existingRaw ? JSON.parse(existingRaw) : { bags: [] };
         const existingIds = new Set((existing.bags || []).map(b => b.id));
+        // Hide posts already pulled once (even if since deleted) so the widget
+        // shows only genuinely-new posts, never re-surfaces what the owner removed.
+        const ledgerRaw = await env.BAGS.get("ig_synced_codes");
+        const syncedCodes = new Set(ledgerRaw ? JSON.parse(ledgerRaw) : []);
 
         const feedData = await fetchIgFeed({ username, userId: directUserId, count: 50 });
         if (!feedData.items) return json({ error: feedData.error || "feed empty" }, 502);
 
-        const fresh = feedData.items.filter(it => !existingIds.has(`ig_${it.shortcode}`)).slice(0, limit * 2);
+        const fresh = feedData.items.filter(it => !existingIds.has(`ig_${it.shortcode}`) && !syncedCodes.has(it.shortcode)).slice(0, limit * 2);
         const classified = await Promise.all(fresh.map(async (it) => {
           const heuristic = looksLikeProduct(it.caption);
           const [vision, text] = await Promise.all([
@@ -1307,6 +1394,7 @@ export default {
               name,
               category,
               stock: heuristicSuggestion.stock,
+              price: heuristicSuggestion.price,
               description: heuristicSuggestion.description,
             },
             ai_reason: reason,
@@ -1345,6 +1433,9 @@ export default {
       const existingRaw = await env.BAGS.get("data");
       const data = existingRaw ? JSON.parse(existingRaw) : { bags: [], settings: {} };
       const existingIds = new Set(data.bags.map(b => b.id));
+      const existingIgUrls = new Set(data.bags.map(b => b.instagramUrl).filter(Boolean));
+      const ledgerRaw = await env.BAGS.get("ig_synced_codes");
+      const syncedCodes = new Set(ledgerRaw ? JSON.parse(ledgerRaw) : []);
 
       const added = [];
       const errors = [];
@@ -1352,7 +1443,8 @@ export default {
 
       for (const it of items) {
         const id = `ig_${it.shortcode}`;
-        if (existingIds.has(id)) { errors.push({ shortcode: it.shortcode, reason: "already in catalog" }); continue; }
+        const igUrl = `https://www.instagram.com/p/${it.shortcode}/`;
+        if (existingIds.has(id) || syncedCodes.has(it.shortcode) || existingIgUrls.has(igUrl)) { errors.push({ shortcode: it.shortcode, reason: "already synced" }); continue; }
         const urls = (it.imageUrls || []).slice(0, 4);
         if (!urls.length) { errors.push({ shortcode: it.shortcode, reason: "no images" }); continue; }
         const uploaded = [];
@@ -1390,7 +1482,7 @@ export default {
           name: (it.name || "New Item").slice(0, 80),
           category,
           description: it.description || "Premium menswear, hand-selected. Photographed exactly as it is. Pick your size below to enquire.",
-          price: 0,
+          price: Number(it.price) > 0 ? Number(it.price) : 0, // owner-confirmed or caption-parsed
           stock,
           sales: [],
           image: uploaded[0],
@@ -1406,6 +1498,8 @@ export default {
       // Newest first — prepend to the catalog
       data.bags = newBags.concat(data.bags);
       await env.BAGS.put("data", JSON.stringify(data));
+      for (const it of items) syncedCodes.add(it.shortcode);
+      await env.BAGS.put("ig_synced_codes", JSON.stringify([...syncedCodes]));
       return json({ ok: true, added: added.length, errors, items: added });
     }
 
