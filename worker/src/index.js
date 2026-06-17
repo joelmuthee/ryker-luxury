@@ -275,13 +275,25 @@ function captionToDescription(caption) {
 function parseCaptionForBag(caption) {
   const text = (caption || "").trim();
   const lower = text.toLowerCase();
-  // Cut everything after the first WA/phone/CTA marker — captions often end
-  // with a phone number block that has noise like "0712...".
-  const cleaned = text.split(/whatsapp|whastup|wa\.me|0\d{8,}/i)[0].trim().replace(/[.\s]+$/, "");
   let [brand, category] = deriveBrand(caption);
-  if (!brand) {
-    const first = cleaned.split(/\.\.|\.\s|,|\n|·/)[0].trim();
-    brand = first ? first.slice(0, 60).replace(/\b\w/g, c => c.toUpperCase()) : "New Item";
+  // Name + description from the price-stripped caption, so no "@1750/=" ever
+  // lands in the NAME (the fallback used to take the raw caption clause).
+  const desc = captionToDescription(caption);
+  const hasCaption = desc !== DEFAULT_DESC;
+  let name, description;
+  if (brand) {
+    name = brand;
+    description = hasCaption ? desc : DEFAULT_DESC;
+  } else if (hasCaption) {
+    // No brand — the descriptor is the name (first clause, Title Case); the rest
+    // becomes the description, falling back to the canned line when there's none.
+    const head = (desc.split(/[.!?\n]|,(?=\s)/)[0] || "").trim();
+    name = (head || desc).slice(0, 70).replace(/\b\w/g, c => c.toUpperCase());
+    const rest = desc.slice(head.length).replace(/^[\s.,!?]+/, "").trim();
+    description = rest.length >= 10 ? rest : DEFAULT_DESC;
+  } else {
+    name = "New Item";
+    description = DEFAULT_DESC;
   }
 
   const stock = {};
@@ -335,11 +347,11 @@ function parseCaptionForBag(caption) {
   if (!Object.keys(stock).length) stock["One Size"] = 1;
 
   return {
-    name: brand,
+    name: name || "New Item",
     category: category || null,
     stock,
     price: parsePriceFromCaption(caption),
-    description: captionToDescription(caption),
+    description,
   };
 }
 
