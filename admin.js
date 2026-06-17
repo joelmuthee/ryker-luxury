@@ -6,6 +6,10 @@ const SHOP_URL = 'https://rykerluxury.co.ke'; // public storefront — used in W
 // Tier gate: Boost-to-top is a 3k Shop Records-and-up feature. Set false on a
 // one-off Shopfront build to hide the boost bulk-bar buttons. Default true.
 const BOOST_ENABLED = true;
+// Tier gate: branded IMAGE receipts are a Shop Manager (5k)-and-up feature.
+// Text + print receipts stay on Shop Records (3k); this only hides the polished
+// PNG receipt button. Set false on Shopfront / Shop Records builds. Default true.
+const RECEIPT_IMAGE_ENABLED = true;
 
 let bags = [];
 let settings = {};
@@ -2675,6 +2679,7 @@ function renderIgSyncList() {
           </div>
           <div class="ig-sync-row-2">
             <span class="ig-sync-size">${escapeHtml(stockText)}</span>
+            <input type="number" min="0" class="ig-sync-price" data-ig-price="${i}" value="${s.price > 0 ? s.price : ''}" placeholder="Ksh (blank = on request)" style="width:170px;max-width:48%;padding:4px 8px;border:1px solid var(--border,#ccc);border-radius:6px;font-size:13px;">
             <a href="${escapeHtml(it.postUrl)}" target="_blank" rel="noopener" class="ig-sync-postlink">view on IG ↗</a>
           </div>
           <div class="ig-sync-caption">${escapeHtml(captionShort)}</div>
@@ -2697,11 +2702,14 @@ async function commitIgSync() {
     if (!cb || !cb.checked) return;
     const nameEl = igSyncListEl.querySelector(`[data-ig-name="${i}"]`);
     const catEl = igSyncListEl.querySelector(`[data-ig-cat="${i}"]`);
+    const priceEl = igSyncListEl.querySelector(`[data-ig-price="${i}"]`);
+    const priceRaw = (priceEl?.value || '').trim();
     picks.push({
       shortcode: it.shortcode,
       name: (nameEl?.value || it.suggested?.name || '').trim() || 'New Item',
       category: catEl?.value || it.suggested?.category || 'Shirts',
       stock: it.suggested?.stock || { 'One Size': 1 },
+      price: priceRaw === '' ? 0 : (parseInt(priceRaw, 10) || 0),
       description: it.suggested?.description || '',
       imageUrls: it.imageUrls || [it.imageUrl],
       takenAt: it.takenAt,
@@ -2874,6 +2882,8 @@ function showPosReceipt(s) {
     wa.href = `https://wa.me/${posWaPhone(s.buyerPhone)}?text=${encodeURIComponent(posReceiptText(s))}`;
     wa.style.display = '';
   } else { wa.style.display = 'none'; }
+  const imgBtn = document.getElementById('posImgReceiptBtn'); // Shop Manager (5k)+ only
+  if (imgBtn) imgBtn.style.display = RECEIPT_IMAGE_ENABLED ? '' : 'none';
   document.getElementById('posReceiptPanel').style.display = '';
 }
 
@@ -2889,6 +2899,7 @@ function posPrintReceipt() {
       <div class="rcpt-row"><span>Size ${escapeHtml(s.size)} · ${s.qty} × ${fmtKsh(s.amount)}</span><span>${fmtKsh(total)}</span></div>
       <hr>
       <div class="rcpt-row rcpt-total"><span>TOTAL</span><span>${fmtKsh(total)}</span></div>
+      ${s.buyerName ? `<div class="rcpt-row"><span>Customer</span><span>${escapeHtml(s.buyerName)}</span></div>` : ''}
       <div class="rcpt-row"><span>Paid by</span><span>${s.paymentMethod === 'mpesa' ? 'M-Pesa' : 'Cash'}</span></div>
       ${s.balance > 0 ? `<div class="rcpt-row"><span>Paid now</span><span>${fmtKsh(s.paid)}</span></div><div class="rcpt-row rcpt-total"><span>BALANCE OWING</span><span>${fmtKsh(s.balance)}</span></div>` : ''}
       <div class="rcpt-date">${d.toLocaleString('en-GB')}</div>
@@ -2943,6 +2954,132 @@ async function recordPosSale() {
   finally { btn.disabled = false; }
 }
 
+// --- Image receipt (canvas PNG) -------------------------------------------
+// Draws the sale receipt onto a canvas and shares/saves it as a PNG. Pure
+// canvas, no library, so it works inside the WhatsApp / Instagram in-app
+// browser (a heavy DOM-snapshot lib would glitch there). The logo is
+// same-origin (images/logo.jpg) so the canvas never gets tainted and the
+// export always succeeds.
+let _receiptLogo = null;
+function loadReceiptLogo() {
+  if (_receiptLogo !== null) return Promise.resolve(_receiptLogo || null);
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => { _receiptLogo = img; res(img); };
+    img.onerror = () => { _receiptLogo = false; res(null); };
+    img.src = 'images/logo.jpg';
+  });
+}
+
+function buildReceiptCanvas(s, logoImg) {
+  const SCALE = 3, W = 620, M = 44;
+  const hasBal = s.balance > 0;
+  const seg = { top: 34, logo: logoImg ? 132 : 88, caption: 30, addr: 46, div1: 26,
+    item: 64, div2: 26, total: 52, cust: s.buyerName ? 34 : 0, paid: 34, bal: hasBal ? 70 : 0, date: 38, foot: 60, bottom: 30 };
+  const H = Object.values(seg).reduce((a, b) => a + b, 0);
+  const c = document.createElement('canvas');
+  c.width = W * SCALE; c.height = H * SCALE;
+  const x = c.getContext('2d');
+  x.scale(SCALE, SCALE);
+  const trunc = (t, n) => { t = String(t || ''); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
+
+  x.fillStyle = '#fffdf8'; x.fillRect(0, 0, W, H);
+  x.fillStyle = '#b8956a'; x.fillRect(0, 0, W, 6);
+  let y = seg.top;
+
+  x.textAlign = 'center';
+  if (logoImg) {
+    const lw = 150, lh = Math.min(lw * (logoImg.height / logoImg.width || 1), 118);
+    x.drawImage(logoImg, (W - lw) / 2, y, lw, lh);
+  } else {
+    x.fillStyle = '#2a1c0f'; x.font = '600 34px Georgia, serif';
+    x.fillText('Ryker Luxury', W / 2, y + 40);
+  }
+  y += seg.logo;
+
+  x.fillStyle = '#8a6f44'; x.font = '600 15px Arial';
+  x.fillText('S A L E   R E C E I P T', W / 2, y); y += seg.caption;
+
+  x.fillStyle = '#8a7460'; x.font = '13px Arial';
+  x.fillText('Legend Valley Business Park, Gitanga Road, Nairobi', W / 2, y);
+  x.fillText('0714 672 436', W / 2, y + 18); y += seg.addr;
+
+  const div = () => { x.strokeStyle = '#ebe0c9'; x.lineWidth = 1; x.beginPath(); x.moveTo(M, y); x.lineTo(W - M, y); x.stroke(); };
+  div(); y += seg.div1;
+
+  const total = s.amount * s.qty;
+  x.textAlign = 'left'; x.fillStyle = '#2a1c0f'; x.font = '600 18px Arial';
+  x.fillText(trunc(s.name, 32), M, y + 6);
+  x.fillStyle = '#8a7460'; x.font = '14px Arial';
+  x.fillText(`Size ${s.size} · ${s.qty} × ${fmtKsh(s.amount)}`, M, y + 30);
+  x.textAlign = 'right'; x.fillStyle = '#2a1c0f'; x.font = '600 18px Arial';
+  x.fillText(fmtKsh(total), W - M, y + 30); y += seg.item;
+
+  x.textAlign = 'left'; div(); y += seg.div2;
+
+  x.fillStyle = '#2a1c0f'; x.font = '700 22px Arial'; x.fillText('TOTAL', M, y + 8);
+  x.textAlign = 'right'; x.fillStyle = '#8a6f44'; x.font = '700 24px Arial';
+  x.fillText(fmtKsh(total), W - M, y + 8); y += seg.total;
+
+  if (s.buyerName) {
+    x.textAlign = 'left'; x.fillStyle = '#4a3528'; x.font = '15px Arial'; x.fillText('Customer', M, y);
+    x.textAlign = 'right'; x.fillStyle = '#2a1c0f'; x.font = '600 15px Arial';
+    x.fillText(trunc(s.buyerName, 26), W - M, y); y += seg.cust;
+  }
+
+  x.textAlign = 'left'; x.fillStyle = '#4a3528'; x.font = '15px Arial'; x.fillText('Paid by', M, y);
+  x.textAlign = 'right'; x.fillStyle = '#2a1c0f'; x.font = '600 15px Arial';
+  x.fillText(s.paymentMethod === 'mpesa' ? 'M-Pesa' : 'Cash', W - M, y); y += seg.paid;
+
+  if (hasBal) {
+    x.textAlign = 'left'; x.fillStyle = '#4a3528'; x.font = '15px Arial'; x.fillText('Paid now', M, y);
+    x.textAlign = 'right'; x.fillStyle = '#2a1c0f'; x.font = '600 15px Arial'; x.fillText(fmtKsh(s.paid), W - M, y); y += 34;
+    x.textAlign = 'left'; x.fillStyle = '#b00020'; x.font = '700 16px Arial'; x.fillText('BALANCE OWING', M, y);
+    x.textAlign = 'right'; x.fillText(fmtKsh(s.balance), W - M, y); y += 36;
+  }
+
+  x.textAlign = 'center'; x.fillStyle = '#8a7460'; x.font = '13px Arial';
+  x.fillText(new Date(s.soldAt || Date.now()).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), W / 2, y); y += seg.date;
+
+  x.fillStyle = '#8a6f44'; x.font = 'italic 16px Georgia, serif';
+  x.fillText('Thank you for shopping with us', W / 2, y);
+  x.fillStyle = '#b8956a'; x.font = '600 13px Arial';
+  x.fillText('rykerluxury.co.ke', W / 2, y + 24);
+  return c;
+}
+
+async function posShareReceiptImage() {
+  if (!lastPosSale) return;
+  const btn = document.getElementById('posImgReceiptBtn');
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Preparing…'; }
+  try {
+    const logo = await loadReceiptLogo();
+    const canvas = buildReceiptCanvas(lastPosSale, logo);
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+    if (!blob) throw new Error('render failed');
+    const fname = `ryker-receipt-${(lastPosSale.name || 'sale').replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 32)}.png`;
+    const file = new File([blob], fname, { type: 'image/png' });
+    // Best path: native share sheet with the image file (lets the owner pick
+    // WhatsApp and the customer chat, image attached). Falls back to a download
+    // when file-share isn't supported (some in-app webviews).
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'Ryker Luxury receipt', text: posReceiptText(lastPosSale) });
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = fname;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      showToast('Receipt image saved to your phone — attach it in WhatsApp.');
+    }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return; // owner closed the share sheet
+    showToast('Could not make the receipt image: ' + (e.message || e));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
+  }
+}
+
 document.getElementById('posItemSearch')?.addEventListener('input', e => {
   posItemId = '';
   document.getElementById('posSaleFields').style.display = 'none';
@@ -2966,5 +3103,6 @@ document.getElementById('posRecordBtn')?.addEventListener('click', recordPosSale
 document.getElementById('posCancelBtn')?.addEventListener('click', posReset);
 document.getElementById('posNewSaleBtn')?.addEventListener('click', posReset);
 document.getElementById('posPrintReceiptBtn')?.addEventListener('click', posPrintReceipt);
+document.getElementById('posImgReceiptBtn')?.addEventListener('click', posShareReceiptImage);
 
 checkAuth();
