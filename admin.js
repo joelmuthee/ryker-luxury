@@ -14,6 +14,7 @@ const RECEIPT_IMAGE_ENABLED = true;
 let bags = [];
 let settings = {};
 let clients = []; // manually-added clients (server-synced); sale buyers are derived separately
+let expenses = []; // operating expenses (ad spend, packaging, etc.) — admin-only, server-synced
 let editingId = null;
 let stagedImage = null; // { base64, ext, dataUrl }
 let pendingSaleId = null;
@@ -127,7 +128,7 @@ async function apiPublish() {
   const res = await fetch(`${API_BASE}/api/bulk`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ADMIN_TOKEN}` },
-    body: JSON.stringify({ bags, settings, clients }),
+    body: JSON.stringify({ bags, settings, clients, expenses }),
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Save failed: ${res.status}`); }
 }
@@ -146,6 +147,7 @@ async function apiMutateAndPublish(mutate) {
   bags = Array.isArray(json.bags) ? json.bags : [];
   settings = json.settings || {};
   clients = Array.isArray(json.clients) ? json.clients : [];
+  expenses = Array.isArray(json.expenses) ? json.expenses : [];
   await mutate();
   await apiPublish();
 }
@@ -157,6 +159,7 @@ async function loadData() {
   bags = json.bags || [];
   settings = json.settings || {};
   clients = Array.isArray(json.clients) ? json.clients : [];
+  expenses = Array.isArray(json.expenses) ? json.expenses : [];
   accountSuspended = !!json.suspended;
 }
 
@@ -533,6 +536,11 @@ document.querySelectorAll('.stock-details[data-stock-group]').forEach(det => {
   const broadcastSummary = broadcastCollapse?.querySelector('summary.dash-summary');
   if (broadcastSummary) broadcastSummary.addEventListener('click', (e) => { e.preventDefault(); broadcastCollapse.open = !broadcastCollapse.open; });
   document.querySelector('.admin-nav a[href="#broadcastDash"]')?.addEventListener('click', () => { if (broadcastCollapse) broadcastCollapse.open = true; });
+
+  const expensesCollapse = document.getElementById('expensesCollapse');
+  const expensesSummary = expensesCollapse?.querySelector('summary.dash-summary');
+  if (expensesSummary) expensesSummary.addEventListener('click', (e) => { e.preventDefault(); expensesCollapse.open = !expensesCollapse.open; });
+  document.querySelector('.admin-nav a[href="#expensesDash"]')?.addEventListener('click', () => { if (expensesCollapse) expensesCollapse.open = true; });
 })();
 
 // ====== AI DESCRIPTION ======
@@ -1144,6 +1152,211 @@ function itemAddedAt(bag) {
   return m ? new Date(parseInt(m[1], 10)).toISOString() : null;
 }
 
+// ==================== EXPENSES ====================
+// Operating expenses (IG ad spend, packaging, transport, etc.) — the owner's
+// private books, never on the public store. One-off (a dated amount) or
+// recurring (an amount per day/week/month that auto-accrues from a start date,
+// an estimate). Net profit on the dashboard = gross profit − total expenses.
+const EXPENSES_ENABLED = true; // 5k Shop Manager tier (sits with profit tracking); flip false below 5k
+const EXPENSE_CATEGORIES = ['Instagram ads', 'Other ads', 'Packaging', 'Transport / Delivery', 'Stock buying', 'Rent', 'Airtime / Data', 'Other'];
+const EXP_DAY_MS = 86400000;
+let expEditId = null, expConfirmDel = null;
+const todayISO = () => new Date().toISOString().slice(0, 10);
+
+function expRecurringPeriods(exp, asOf) {
+  const start = Date.parse(exp.startDate);
+  if (!Number.isFinite(start)) return 0;
+  let end = asOf;
+  if (exp.endDate) { const e = Date.parse(exp.endDate); if (Number.isFinite(e)) end = Math.min(end, e); }
+  if (end < start) return 0;
+  const days = Math.floor((end - start) / EXP_DAY_MS);
+  if (exp.cadence === 'weekly') return Math.floor(days / 7) + 1;
+  if (exp.cadence === 'monthly') { const a = new Date(start), b = new Date(end); return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth()) + 1; }
+  return days + 1;
+}
+function expenseAccrued(exp, asOf = Date.now()) {
+  const amt = Number(exp.amount) || 0;
+  return exp.type === 'recurring' ? amt * expRecurringPeriods(exp, asOf) : amt;
+}
+function expensesTotal(asOf = Date.now()) { return (expenses || []).reduce((s, e) => s + expenseAccrued(e, asOf), 0); }
+function expensesBetween(from, to) {
+  let sum = 0;
+  for (const e of (expenses || [])) {
+    if (e.type === 'recurring') sum += expenseAccrued(e, to) - expenseAccrued(e, from);
+    else { const d = Date.parse(e.date); if (Number.isFinite(d) && d >= from && d <= to) sum += Number(e.amount) || 0; }
+  }
+  return Math.max(0, Math.round(sum));
+}
+function expUsedCategories() {
+  const used = new Set();
+  (expenses || []).forEach(e => { if (e.category && !EXPENSE_CATEGORIES.includes(e.category)) used.add(e.category); });
+  return [...used].sort((a, b) => a.localeCompare(b));
+}
+function buildExpCategorySelect(selected) {
+  const sel = document.getElementById('expCategory');
+  if (!sel) return;
+  const custom = expUsedCategories();
+  if (selected && !EXPENSE_CATEGORIES.includes(selected) && !custom.includes(selected)) custom.push(selected);
+  let html = EXPENSE_CATEGORIES.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  if (custom.length) html += `<optgroup label="Your categories">${custom.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}</optgroup>`;
+  html += `<option value="__new__">+ Add new category…</option>`;
+  sel.innerHTML = html;
+  sel.value = (selected && [...sel.options].some(o => o.value === selected)) ? selected : EXPENSE_CATEGORIES[0];
+  toggleExpNewCategory();
+}
+function toggleExpNewCategory() {
+  const sel = document.getElementById('expCategory'), box = document.getElementById('expCategoryNew');
+  if (!sel || !box) return;
+  if (sel.value === '__new__') { box.style.display = ''; box.focus(); } else { box.style.display = 'none'; box.value = ''; }
+}
+function getExpCategory() {
+  const sel = document.getElementById('expCategory');
+  if (!sel) return 'Other';
+  if (sel.value === '__new__') return document.getElementById('expCategoryNew').value.trim() || 'Other';
+  return sel.value || 'Other';
+}
+function expCadenceWord(c) { return c === 'weekly' ? 'week' : c === 'monthly' ? 'month' : 'day'; }
+function expDescribe(e) {
+  if (e.type === 'recurring') {
+    const since = e.startDate ? fmtDate(e.startDate) : '';
+    return `${fmtKsh(e.amount)}/${expCadenceWord(e.cadence)} · since ${since}${e.active === false ? ' · stopped' : ''}`;
+  }
+  return `${fmtKsh(e.amount)} · ${e.date ? fmtDate(e.date) : ''}`;
+}
+function renderExpenses() {
+  if (!EXPENSES_ENABLED) return;
+  const grid = document.getElementById('expKpiGrid'), list = document.getElementById('expList');
+  if (!grid || !list) return;
+  const now = Date.now();
+  const monthStart = (() => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d.getTime(); })();
+  const monthSpend = expensesBetween(monthStart, now);
+  const allSpend = Math.round(expensesTotal(now));
+  const activeRecurring = (expenses || []).filter(e => e.type === 'recurring' && e.active !== false).length;
+  grid.innerHTML = `
+    <div class="inv-kpi"><div class="inv-kpi-label">Spent this month</div><div class="inv-kpi-val">${fmtKsh(monthSpend)}</div><div class="inv-kpi-sub">on ads, packaging, etc.</div></div>
+    <div class="inv-kpi"><div class="inv-kpi-label">Spent all-time</div><div class="inv-kpi-val">${fmtKsh(allSpend)}</div><div class="inv-kpi-sub">total recorded</div></div>
+    <div class="inv-kpi"><div class="inv-kpi-label">Recurring running</div><div class="inv-kpi-val">${activeRecurring}</div><div class="inv-kpi-sub">auto-adding spend</div></div>`;
+  const set = (expenses || []).slice().sort((a, b) => (Date.parse(b.date || b.startDate || b.createdAt) || 0) - (Date.parse(a.date || a.startDate || a.createdAt) || 0));
+  if (!set.length) { list.innerHTML = `<p style="font-size:13px;color:#8a857f;padding:8px 2px;">No expenses logged yet. Add your Instagram ad spend, packaging, transport — anything you spend on the shop — to see your real profit.</p>`; return; }
+  list.innerHTML = set.map(e => {
+    const accrued = e.type === 'recurring' ? `<span style="color:#8a857f;font-size:12px;"> · ${fmtKsh(Math.round(expenseAccrued(e)))} so far</span>` : '';
+    const actions = (expConfirmDel === e.id)
+      ? `<button class="btn-admin danger" data-exp-del="${e.id}" type="button">Delete</button><button class="btn-admin" data-exp-delcancel="1" type="button">Cancel</button>`
+      : `<button class="btn-admin" data-exp-edit="${e.id}" type="button">Edit</button><button class="btn-admin" data-exp-askdel="${e.id}" type="button">Remove</button>`;
+    return `<div class="client-row">
+      <div class="client-row-main">
+        <div class="client-row-name">${escapeHtml(e.label || 'Expense')}</div>
+        <div class="client-row-sub">${escapeHtml(e.category || 'Other')} · ${expDescribe(e)}${accrued}</div>
+        ${e.note ? `<div class="client-note">${escapeHtml(e.note)}</div>` : ''}
+      </div>
+      <div class="client-row-actions">${actions}</div>
+    </div>`;
+  }).join('');
+}
+function expSyncTypeFields() {
+  const type = document.querySelector('#expTypeToggle .pos-pay-btn.active')?.dataset.exptype || 'oneoff';
+  const oneoff = document.getElementById('expOneoffFields'), recur = document.getElementById('expRecurringFields');
+  if (oneoff) oneoff.style.display = type === 'oneoff' ? '' : 'none';
+  if (recur) recur.style.display = type === 'recurring' ? '' : 'none';
+}
+function expResetForm() {
+  expEditId = null;
+  const v = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+  v('expLabel', ''); v('expAmount', ''); v('expNote', '');
+  buildExpCategorySelect();
+  document.querySelectorAll('#expTypeToggle .pos-pay-btn').forEach(b => b.classList.toggle('active', b.dataset.exptype === 'oneoff'));
+  v('expDate', todayISO());
+  const cad = document.getElementById('expCadence'); if (cad) cad.value = 'daily';
+  v('expStartDate', todayISO());
+  const act = document.getElementById('expActive'); if (act) act.checked = true;
+  const sv = document.getElementById('expSaveBtn'); if (sv) sv.textContent = 'Save expense';
+  expSyncTypeFields();
+}
+function editExpense(id) {
+  const e = (expenses || []).find(x => x.id === id);
+  if (!e) return;
+  expEditId = id;
+  const v = (eid, val) => { const el = document.getElementById(eid); if (el) el.value = val; };
+  v('expLabel', e.label || ''); v('expAmount', e.amount || ''); v('expNote', e.note || '');
+  buildExpCategorySelect(e.category);
+  document.querySelectorAll('#expTypeToggle .pos-pay-btn').forEach(b => b.classList.toggle('active', b.dataset.exptype === (e.type || 'oneoff')));
+  v('expDate', e.date || todayISO());
+  const cad = document.getElementById('expCadence'); if (cad) cad.value = e.cadence || 'daily';
+  v('expStartDate', e.startDate || todayISO());
+  const act = document.getElementById('expActive'); if (act) act.checked = e.active !== false;
+  const sv = document.getElementById('expSaveBtn'); if (sv) sv.textContent = 'Update expense';
+  expSyncTypeFields();
+  const form = document.getElementById('expFormWrap'); if (form && form.tagName === 'DETAILS') form.open = true;
+  document.getElementById('expLabel')?.focus();
+}
+async function saveExpense() {
+  if (!EXPENSES_ENABLED) return;
+  const label = document.getElementById('expLabel').value.trim();
+  const amount = Math.round(Number(document.getElementById('expAmount').value) || 0);
+  const category = getExpCategory();
+  const type = document.querySelector('#expTypeToggle .pos-pay-btn.active')?.dataset.exptype || 'oneoff';
+  const note = document.getElementById('expNote').value.trim();
+  if (!label) { showToast('Give the expense a name.'); return; }
+  if (!(amount > 0)) { showToast('Enter an amount more than 0.'); return; }
+  const exp = { id: expEditId || `exp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, label, amount, category, type, note };
+  if (type === 'recurring') {
+    exp.cadence = document.getElementById('expCadence').value || 'daily';
+    exp.startDate = document.getElementById('expStartDate').value || todayISO();
+    exp.active = document.getElementById('expActive').checked;
+    if (!exp.active) exp.endDate = (expenses.find(x => x.id === exp.id)?.endDate) || todayISO();
+  } else { exp.date = document.getElementById('expDate').value || todayISO(); }
+  const editing = !!expEditId;
+  if (!editing) exp.createdAt = new Date().toISOString();
+  const btn = document.getElementById('expSaveBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    await apiMutateAndPublish(() => {
+      const i = expenses.findIndex(x => x.id === exp.id);
+      if (i >= 0) expenses[i] = { ...expenses[i], ...exp }; else expenses.push(exp);
+    });
+    expResetForm();
+    renderDashboard();
+    showToast(editing ? 'Expense updated.' : 'Expense added.');
+    const wrap = document.getElementById('expFormWrap'); if (wrap && wrap.tagName === 'DETAILS') wrap.open = false;
+  } catch (e) { showToast(e.message || 'Could not save.'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = editing ? 'Update expense' : 'Save expense'; } }
+}
+async function deleteExpense(id) {
+  try {
+    await apiMutateAndPublish(() => { expenses = expenses.filter(x => x.id !== id); });
+    expConfirmDel = null;
+    if (expEditId === id) expResetForm();
+    renderDashboard();
+    showToast('Expense removed.');
+  } catch (e) { showToast(e.message || 'Could not remove.'); }
+}
+function initExpenses() {
+  if (!EXPENSES_ENABLED) {
+    document.getElementById('expensesDash')?.style.setProperty('display', 'none');
+    document.querySelector('.admin-nav a[href="#expensesDash"]')?.style.setProperty('display', 'none');
+    return;
+  }
+  buildExpCategorySelect();
+  document.getElementById('expCategory')?.addEventListener('change', toggleExpNewCategory);
+  document.getElementById('expDate') && (document.getElementById('expDate').value = todayISO());
+  document.getElementById('expStartDate') && (document.getElementById('expStartDate').value = todayISO());
+  document.getElementById('expTypeToggle')?.addEventListener('click', (ev) => {
+    const b = ev.target.closest('.pos-pay-btn'); if (!b) return;
+    document.querySelectorAll('#expTypeToggle .pos-pay-btn').forEach(x => x.classList.toggle('active', x === b));
+    expSyncTypeFields();
+  });
+  document.getElementById('expSaveBtn')?.addEventListener('click', saveExpense);
+  document.getElementById('expCancelBtn')?.addEventListener('click', () => { expResetForm(); const w = document.getElementById('expFormWrap'); if (w && w.tagName === 'DETAILS') w.open = false; });
+  document.getElementById('expList')?.addEventListener('click', (ev) => {
+    const t = ev.target.closest('button'); if (!t) return;
+    if (t.dataset.expEdit) editExpense(t.dataset.expEdit);
+    else if (t.dataset.expAskdel) { expConfirmDel = t.dataset.expAskdel; renderExpenses(); }
+    else if (t.dataset.expDelcancel) { expConfirmDel = null; renderExpenses(); }
+    else if (t.dataset.expDel) deleteExpense(t.dataset.expDel);
+  });
+  expSyncTypeFields();
+}
+
 function renderDashboard() {
   const now = new Date();
   const buckets = [
@@ -1186,6 +1399,9 @@ function renderDashboard() {
         ? `<span id="statAllProfitNote" style="color:#999;font-weight:400;"> · from ${costKnown}/${soldItemsCount} with cost</span>`
         : '';
       profitSub = `<div id="statAllProfitSub" class="kpi-profit" style="font-size:12px;color:#2e7d32;font-weight:600;margin-top:2px;">Profit <span id="statAllProfit">${fmtKsh(profitAll)}</span>${note}</div>`;
+      // Net profit after operating expenses (ad spend etc.), once any is logged.
+      const expTot = (typeof expensesTotal === 'function') ? Math.round(expensesTotal()) : 0;
+      if (expTot > 0) profitSub += `<div class="kpi-profit" style="font-size:12px;color:#1c1208;font-weight:600;margin-top:2px;">Expenses ${fmtKsh(expTot)} · Net ${fmtKsh(profitAll - expTot)}</div>`;
     }
     return `
     <div class="kpi-card">
@@ -1264,6 +1480,7 @@ function renderDashboard() {
     : '<p style="color:#999;font-size:13px;">No sales recorded yet.</p>';
 
   if (typeof renderOwed === 'function') renderOwed();
+  if (typeof renderExpenses === 'function') renderExpenses();
 }
 
 // ====== INVENTORY ======
@@ -2777,6 +2994,7 @@ async function init() {
   if (catSel) catSel.addEventListener('change', toggleNewCategoryInput);
   await loadData();
   renderSuspendedBanner();
+  initExpenses();
   renderList();
   renderDashboard();
   renderInventory();
