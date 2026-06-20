@@ -937,6 +937,8 @@ async function recordSale(withBuyer) {
     renderList();
     renderDashboard();
     renderInventory();
+    if (typeof renderClients === 'function') renderClients();
+    if (typeof renderOwed === 'function') renderOwed();
     showToast(`Sale recorded — ${qty}× ${size} sold.`);
     if (withBuyer && (sale.buyerName || sale.buyerPhone)) sendBuyerToGHL(soldBag, sale);
     // Offer a receipt (same panel the Sell-in-store flow uses).
@@ -3195,6 +3197,7 @@ async function recordPosSale() {
     lastPosSale = { name: soldName, size, qty, amount, paid: amountPaid, balance, paymentMethod: posPayMethod, buyerName: name, buyerPhone: phone, soldAt };
     renderList(); renderDashboard(); renderInventory();
     if (typeof renderClients === 'function') renderClients();
+    if (typeof renderOwed === 'function') renderOwed();
     showPosReceipt(lastPosSale);
     showToast(balance > 0 ? `Sold · ${fmtKsh(amountPaid)} paid, ${fmtKsh(balance)} owed` : `Sold ${qty}× ${size} · ${fmtKsh(total)}`);
   } catch (e) { showToast('Error: ' + e.message); }
