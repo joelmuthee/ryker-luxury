@@ -810,7 +810,7 @@ html { scroll-behavior: smooth; }
 .recent-list::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 4px; }
 .recent-row { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
 .recent-main { display: flex; gap: 10px; align-items: center; min-width: 0; }
-.recent-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.recent-actions { display: grid; grid-template-columns: auto auto; gap: 6px; flex-shrink: 0; align-content: center; }
 .recent-actions button { padding: 5px 10px; font-size: 12px; border-radius: 6px; border: 1px solid var(--line); background: #fff; cursor: pointer; font-family: inherit; }
 .recent-actions button:hover { background: var(--ink); color: var(--gold-light); border-color: var(--ink); }
 .recent-actions button.danger { color: #b00020; border-color: #f3c5cc; }
