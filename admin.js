@@ -1475,6 +1475,7 @@ function renderDashboard() {
             </div>
           </div>
           <div class="recent-actions">
+            <button onclick="reissueReceipt('${bag.id}','${s.soldAt}')">🧾 Receipt</button>
             <button onclick="openEditSale('${bag.id}','${s.soldAt}')">Edit</button>
             <button class="danger" onclick="undoSale('${bag.id}','${s.soldAt}')">Undo</button>
           </div>
@@ -3135,6 +3136,26 @@ function showPosReceipt(s) {
   if (imgBtn) imgBtn.style.display = RECEIPT_IMAGE_ENABLED ? '' : 'none';
   document.getElementById('posReceiptPanel').style.display = '';
 }
+
+// Re-issue a receipt for an already-recorded sale (the 🧾 Receipt button in Recent
+// sales). Rebuilds the receipt object from the stored sale, then shows the same
+// send panel (WhatsApp text receipt + branded image receipt) used right after a sale.
+window.reissueReceipt = (bagId, soldAt) => {
+  const bag = bags.find(b => b.id === bagId);
+  const s = bag && (bag.sales || []).find(x => x.soldAt === soldAt);
+  if (!bag || !s) { showToast('Could not find that sale.'); return; }
+  const qty = Number(s.qty) || 1;
+  const amount = Number(s.salePrice || bag.price) || 0;
+  const balance = (typeof saleBalance === 'function') ? saleBalance(bag, s) : 0;
+  lastPosSale = {
+    name: bag.name, size: s.size || '', qty, amount,
+    paid: (amount * qty) - balance, balance,
+    paymentMethod: s.paymentMethod, buyerName: s.buyerName, buyerPhone: s.buyerPhone, soldAt: s.soldAt,
+  };
+  showPosReceipt(lastPosSale);
+  document.getElementById('posDash').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  showToast('Receipt ready — send it on WhatsApp or as an image below.');
+};
 
 function posPrintReceipt() {
   if (!lastPosSale) return;
