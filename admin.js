@@ -1484,6 +1484,7 @@ function renderDashboard() {
 
   if (typeof renderOwed === 'function') renderOwed();
   if (typeof renderExpenses === 'function') renderExpenses();
+  if (typeof renderLoyalty === 'function') renderLoyalty();
 }
 
 // ====== INVENTORY ======
@@ -2037,6 +2038,153 @@ function clientWaPhone(p) {
   else if (d.length === 9) d = '254' + d;
   return d;
 }
+
+// ==================== LOYALTY (Shop Manager 5k) ====================
+// Rewards repeat buyers — a stamp/points card built automatically from the
+// Clients ledger (no extra entry). Admin-only; nothing on the public site.
+const LOYALTY_ENABLED = true; // 5k Shop Manager tier (2026-06-18); flip false below 5k
+const LOYALTY_SHOP = 'Ryker Luxury';
+const DEFAULT_LOYALTY = { enabled: true, mode: 'stamps', threshold: 10, pointsPerKsh: 0.01, rewardLabel: 'a free item' };
+let loyaltyQuery = '';
+const phoneKey = p => String(p == null ? '' : p).replace(/[^0-9]/g, '');
+
+function loyaltyConf() {
+  const l = settings.loyalty || {};
+  return {
+    enabled: l.enabled !== false,
+    mode: l.mode === 'spend' ? 'spend' : 'stamps',
+    threshold: Number(l.threshold) > 0 ? Number(l.threshold) : DEFAULT_LOYALTY.threshold,
+    pointsPerKsh: Number(l.pointsPerKsh) > 0 ? Number(l.pointsPerKsh) : DEFAULT_LOYALTY.pointsPerKsh,
+    rewardLabel: (l.rewardLabel || '').trim() || DEFAULT_LOYALTY.rewardLabel,
+    redemptions: Array.isArray(l.redemptions) ? l.redemptions : [],
+  };
+}
+function loyaltyStatus(c, conf) {
+  const earned = conf.mode === 'spend' ? Math.floor(c.spend * conf.pointsPerKsh) : c.purchases.length;
+  const redeemed = conf.redemptions.filter(r => phoneKey(r.phone) === c.phone).reduce((s, r) => s + (Number(r.cost) || 0), 0);
+  const available = Math.max(0, earned - redeemed);
+  return { earned, redeemed, available, ready: Math.floor(available / conf.threshold), progress: available % conf.threshold, threshold: conf.threshold, unit: conf.mode === 'spend' ? 'points' : 'stamps' };
+}
+function loyaltyMessage(c, conf, st) {
+  const first = (c.name || 'there').split(' ')[0];
+  let msg = `Hi ${first}! `;
+  if (st.ready >= 1) msg += `Good news, you've earned ${conf.rewardLabel} on your ${LOYALTY_SHOP} loyalty card. Claim it on your next visit.`;
+  else if (conf.mode === 'spend') msg += `You're at ${st.progress} of ${conf.threshold} points on your ${LOYALTY_SHOP} loyalty card. A little more and you unlock ${conf.rewardLabel}.`;
+  else { const remaining = conf.threshold - st.progress; msg += `You've collected ${st.progress} of ${conf.threshold} stamps with ${LOYALTY_SHOP}. ${remaining} more and ${conf.rewardLabel} is yours.`; }
+  return msg + `\n${LOYALTY_SHOP}`;
+}
+function syncLoyaltyModeUI(mode) {
+  const ppk = document.getElementById('loyaltyPpkField');
+  const lbl = document.getElementById('loyaltyThresholdLabel');
+  if (ppk) ppk.style.display = mode === 'spend' ? '' : 'none';
+  if (lbl) lbl.textContent = mode === 'spend' ? 'Points needed for a reward' : 'Stamps needed for a reward';
+}
+function renderLoyalty() {
+  if (!LOYALTY_ENABLED) return;
+  const conf = loyaltyConf();
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = v; };
+  const enabledEl = document.getElementById('loyaltyEnabled');
+  if (enabledEl && document.activeElement !== enabledEl) enabledEl.checked = conf.enabled;
+  const modeEl = document.getElementById('loyaltyMode');
+  if (modeEl && document.activeElement !== modeEl) modeEl.value = conf.mode;
+  setVal('loyaltyThreshold', conf.threshold);
+  setVal('loyaltyPpk', conf.pointsPerKsh);
+  setVal('loyaltyReward', conf.rewardLabel);
+  syncLoyaltyModeUI(modeEl ? modeEl.value : conf.mode);
+
+  const withStatus = clientsLedger().map(c => ({ c, st: loyaltyStatus(c, conf) }));
+  const total = withStatus.length;
+  const repeat = withStatus.filter(x => x.c.purchases.length >= 2).length;
+  const readyCount = withStatus.filter(x => x.st.ready >= 1).length;
+  const nav = document.getElementById('navLoyaltyCount'); if (nav) nav.textContent = total || '';
+  const kpi = document.getElementById('loyaltyKpiGrid');
+  if (kpi) kpi.innerHTML = `
+    <div class="inv-kpi"><div class="inv-kpi-label">Customers</div><div class="inv-kpi-val">${total}</div><div class="inv-kpi-sub">${repeat} repeat buyer${repeat === 1 ? '' : 's'}</div></div>
+    <div class="inv-kpi success"><div class="inv-kpi-label">Rewards ready</div><div class="inv-kpi-val">${readyCount}</div><div class="inv-kpi-sub">can claim now</div></div>
+    <div class="inv-kpi"><div class="inv-kpi-label">Redeemed</div><div class="inv-kpi-val">${conf.redemptions.length}</div><div class="inv-kpi-sub">rewards given all-time</div></div>
+    <div class="inv-kpi"><div class="inv-kpi-label">Reward</div><div class="inv-kpi-val" style="font-size:15px;line-height:1.35;">${escapeHtml(conf.rewardLabel)}</div><div class="inv-kpi-sub">${conf.threshold} ${conf.mode === 'spend' ? 'points' : 'stamps'} each</div></div>`;
+  const list = document.getElementById('loyaltyList');
+  if (!list) return;
+  if (!total) { list.innerHTML = '<p style="font-size:13px;color:#999;padding:14px;">No customers yet. Save a buyer\'s name and phone when you record a sale and they\'ll appear here.</p>'; return; }
+  const q = loyaltyQuery.toLowerCase();
+  const rows = withStatus.filter(({ c }) => !q || (c.name || '').toLowerCase().includes(q) || c.phone.includes(q)).sort((a, b) => (b.st.ready - a.st.ready) || (b.c.lastAt - a.c.lastAt));
+  if (!rows.length) { list.innerHTML = '<p style="font-size:13px;color:#999;padding:14px;">No customers match your search.</p>'; return; }
+  list.innerHTML = rows.map(({ c, st }) => {
+    const ready = st.ready >= 1;
+    const pct = ready ? 100 : Math.min(100, Math.round((st.progress / conf.threshold) * 100));
+    const badge = ready ? `<span class="loyalty-ready-badge">Reward ready${st.ready > 1 ? ' ×' + st.ready : ''}</span>` : '';
+    const progLine = ready ? `<span>Can claim ${escapeHtml(conf.rewardLabel)}</span><span>${st.available} ${st.unit}</span>` : `<span>${st.progress} / ${conf.threshold} ${st.unit}</span><span>${conf.threshold - st.progress} to go</span>`;
+    return `<div class="loyalty-row ${ready ? 'ready' : ''}">
+      <div class="loyalty-row-main">
+        <div class="loyalty-row-name">${escapeHtml(c.name || 'Unnamed buyer')}${badge}</div>
+        <div class="loyalty-row-sub">${escapeHtml(c.phone)} · ${c.purchases.length} purchase${c.purchases.length === 1 ? '' : 's'} · ${fmtKsh(c.spend)} spent · last ${relTime(new Date(c.lastAt).toISOString())}</div>
+        <div class="loyalty-row-progress"><div class="loyalty-prog-meta">${progLine}</div><div class="loyalty-bar-track"><div class="loyalty-bar-fill" style="width:${pct}%"></div></div></div>
+      </div>
+      <div class="loyalty-row-actions">
+        <button class="btn-admin" onclick="loyaltyNudge('${c.phone}')">WhatsApp</button>
+        ${ready ? `<button class="btn-admin gold" onclick="loyaltyRedeem('${c.phone}')">Redeem</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+async function saveLoyaltyConfig() {
+  const mode = document.getElementById('loyaltyMode').value === 'spend' ? 'spend' : 'stamps';
+  const threshold = parseInt(document.getElementById('loyaltyThreshold').value, 10);
+  const ppk = parseFloat(document.getElementById('loyaltyPpk').value);
+  const reward = document.getElementById('loyaltyReward').value.trim();
+  const enabled = document.getElementById('loyaltyEnabled').checked;
+  if (!(threshold > 0)) { showToast('Reward threshold must be a positive whole number.'); return; }
+  try {
+    await apiMutateAndPublish(() => {
+      const prev = settings.loyalty || {};
+      settings.loyalty = { enabled, mode, threshold, pointsPerKsh: ppk > 0 ? ppk : DEFAULT_LOYALTY.pointsPerKsh, rewardLabel: reward || DEFAULT_LOYALTY.rewardLabel, redemptions: Array.isArray(prev.redemptions) ? prev.redemptions : [] };
+    });
+    renderLoyalty();
+    showToast('Loyalty settings saved.');
+  } catch (err) { showToast('Sync failed: ' + err.message); }
+}
+window.loyaltyNudge = (phone) => {
+  const conf = loyaltyConf();
+  const c = clientsLedger().find(x => x.phone === phone);
+  if (!c) return;
+  window.open(`https://wa.me/${clientWaPhone(phone)}?text=${encodeURIComponent(loyaltyMessage(c, conf, loyaltyStatus(c, conf)))}`, '_blank');
+};
+window.loyaltyRedeem = async (phone) => {
+  const conf = loyaltyConf();
+  const c = clientsLedger().find(x => x.phone === phone);
+  if (!c) return;
+  const st = loyaltyStatus(c, conf);
+  if (st.ready < 1) { showToast('Not enough ' + st.unit + ' to redeem yet.'); return; }
+  if (!await confirmAction(`Redeem ${conf.rewardLabel} for ${c.name || phone}? This uses ${conf.threshold} ${st.unit}.`, 'Redeem')) return;
+  try {
+    await apiMutateAndPublish(() => {
+      if (!settings.loyalty || typeof settings.loyalty !== 'object') settings.loyalty = {};
+      if (!Array.isArray(settings.loyalty.redemptions)) settings.loyalty.redemptions = [];
+      settings.loyalty.redemptions.push({ phone, name: c.name || '', at: new Date().toISOString(), mode: conf.mode, cost: conf.threshold, rewardLabel: conf.rewardLabel });
+    });
+    renderLoyalty();
+    showToast('Reward redeemed for ' + (c.name || phone) + '.');
+  } catch (err) { showToast('Sync failed: ' + err.message); }
+};
+function initLoyalty() {
+  if (!LOYALTY_ENABLED) {
+    document.getElementById('loyaltyDash')?.style.setProperty('display', 'none');
+    document.querySelector('.admin-nav a[href="#loyaltyDash"]')?.style.setProperty('display', 'none');
+    return;
+  }
+  document.getElementById('loyaltySaveBtn')?.addEventListener('click', saveLoyaltyConfig);
+  document.getElementById('loyaltyMode')?.addEventListener('change', e => syncLoyaltyModeUI(e.target.value));
+  const ls = document.getElementById('loyaltySearch');
+  if (ls) { let t; ls.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { loyaltyQuery = ls.value.trim(); renderLoyalty(); }, 160); }); }
+  document.getElementById('loyaltyMsgReadyBtn')?.addEventListener('click', () => {
+    const conf = loyaltyConf();
+    const ready = clientsLedger().map(c => ({ c, st: loyaltyStatus(c, conf) })).filter(x => x.st.ready >= 1);
+    if (!ready.length) { showToast('No customers have a reward ready.'); return; }
+    showToast(`Opening ${ready.length} WhatsApp tab${ready.length === 1 ? '' : 's'}…`);
+    ready.forEach(({ c }, i) => setTimeout(() => { window.open(`https://wa.me/${clientWaPhone(c.phone)}?text=${encodeURIComponent(loyaltyMessage(c, conf, loyaltyStatus(c, conf)))}`, '_blank'); }, i * 700));
+  });
+}
+
 function renderClients() {
   const listEl = document.getElementById('clientsList');
   if (!listEl) return;
@@ -2998,6 +3146,7 @@ async function init() {
   await loadData();
   renderSuspendedBanner();
   initExpenses();
+  initLoyalty();
   renderList();
   renderDashboard();
   renderInventory();
