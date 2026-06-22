@@ -301,6 +301,11 @@ function parseCaptionForBag(caption) {
   // --- Apparel letter sizes: XS, S, M, L, XL, XXL, 3XL, 4XL, 5XL ---
   // Match any standalone size token. Captions: "Sizes M, L, XL", "S/M/L/XL",
   // "available in M L XL", "sizes: S to XXL".
+  // New products start at 3 of each size FOUND in the caption — the owner
+  // restocks up/down from there instead of starting every size at 1 (owner ask
+  // 2026-06-18). The "One Size" fallback below stays at 1: it's a "no size info"
+  // placeholder, not a size the caption actually provided.
+  const NEW_SIZE_QTY = 3;
   const APPAREL = ["XS", "XXL", "XXXL", "3XL", "4XL", "5XL", "S", "M", "L", "XL"];
   // Use a tagged scan so "size XS" isn't double-counted as XS + S.
   const padded = " " + lower.replace(/[,/|·]+/g, " ").replace(/\s+/g, " ") + " ";
@@ -309,7 +314,7 @@ function parseCaptionForBag(caption) {
     if (re.test(padded)) {
       // Normalise XXXL → 3XL for consistency with admin stock grid
       const key = sz === "XXXL" ? "3XL" : sz;
-      stock[key] = 1;
+      stock[key] = NEW_SIZE_QTY;
     }
   }
 
@@ -324,7 +329,7 @@ function parseCaptionForBag(caption) {
     while ((m = numRe.exec(padded)) !== null) {
       const n = parseInt(m[1], 10);
       if (n >= 28 && n <= 44 && !seen.has(n)) {
-        stock[String(n)] = 1;
+        stock[String(n)] = NEW_SIZE_QTY;
         seen.add(n);
       }
     }
@@ -339,7 +344,7 @@ function parseCaptionForBag(caption) {
     let m;
     while ((m = ukRe.exec(lower)) !== null) {
       const n = parseInt(m[1] || m[2], 10);
-      if (n >= 4 && n <= 13) stock[`UK${n}`] = 1;
+      if (n >= 4 && n <= 13) stock[`UK${n}`] = NEW_SIZE_QTY;
     }
   }
 
