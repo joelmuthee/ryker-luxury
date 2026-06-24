@@ -593,6 +593,8 @@ async function saveItem() {
   const price = priceRaw === '' ? 0 : parseInt(priceRaw, 10);
   const desc = document.getElementById('descInput').value.trim();
   const category = getCategoryValue();
+  const colors = (document.getElementById('colorsInput')?.value || '')
+    .split(',').map(c => c.trim()).filter(Boolean);
   const stock = getStockFromForm();
 
   if (!name) { showToast('Item name is required.'); return; }
@@ -642,6 +644,7 @@ async function saveItem() {
         if (!bag) throw new Error('Item no longer exists — refresh admin');
         bag.name = name;
         bag.category = category;
+        if (colors.length) bag.colors = colors; else delete bag.colors;
         bag.description = desc;
         bag.price = price;
         bag.stock = { ...bag.stock, ...stock };
@@ -660,6 +663,7 @@ async function saveItem() {
       if (!stagedImage) { showToast('Add an item image.'); setSaving(false); return; }
       const id = 'item_' + Date.now();
       const newBag = { id, name, category, description: desc, price, stock, sales: [], image: imagePath, createdAt: new Date().toISOString() };
+      if (colors.length) newBag.colors = colors;
       if (extraUrls.length) newBag.images = [imagePath, ...extraUrls];
       if (stagedInstagramUrl) newBag.instagramUrl = stagedInstagramUrl;
       if (itemSalePrice) newBag.salePrice = itemSalePrice;
@@ -763,6 +767,7 @@ function resetForm() {
   document.getElementById('editingId').value = '';
   document.getElementById('nameInput').value = '';
   setCategoryValue('');
+  document.getElementById('colorsInput').value = '';
   document.getElementById('descInput').value = '';
   document.getElementById('priceInput').value = '';
   document.getElementById('itemSalePriceInput').value = '';
@@ -797,6 +802,7 @@ function editItem(id) {
   document.getElementById('editingId').value = id;
   document.getElementById('nameInput').value = bag.name;
   setCategoryValue(bag.category || '');
+  document.getElementById('colorsInput').value = Array.isArray(bag.colors) ? bag.colors.join(', ') : '';
   document.getElementById('descInput').value = bag.description || '';
   document.getElementById('priceInput').value = bag.price;
   document.getElementById('itemSalePriceInput').value = bag.salePrice || '';

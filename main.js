@@ -161,25 +161,35 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
   function effectivePrice(item) { return isOnSale(item) ? Number(item.salePrice) : Number(item.price || 0); }
   function discountPct(item) { return Math.round((1 - Number(item.salePrice) / Number(item.price)) * 100); }
 
-  function enquireBody(item, soldOut, selectedSize) {
+  // Optional colour variants — a plain list of available colours per item.
+  function itemColors(item) {
+    if (!Array.isArray(item.colors)) return [];
+    return item.colors.map(c => String(c).trim()).filter(Boolean);
+  }
+
+  function enquireBody(item, soldOut, selectedSize, selectedColor) {
     const avail = availSizes(item);
+    const cols = itemColors(item);
     let sizePart = '';
+    let colorPart = '';
     if (!soldOut) {
       if (selectedSize) sizePart = ` (size ${selectedSize})`;
       else if (avail.length === 1) sizePart = ` (size ${avail[0]})`;
       // multi-size with nothing selected → no size in body; click handler blocks before reaching here
+      if (selectedColor) colorPart = ` in ${selectedColor}`;
+      else if (cols.length === 1) colorPart = ` in ${cols[0]}`;
     }
     const pricePart = isOnSale(item)
       ? ` (on sale ${fmtPrice(item.salePrice)}, was ${fmtPrice(item.price)})`
       : (item.price > 0 ? ` (${fmtPrice(item.price)})` : '');
     return soldOut
       ? `Hi Ryker! I saw *${item.name}* is sold out. Will it be back in stock? I'd love to reserve one.`
-      : `Hi Ryker! I'd like to enquire about *${item.name}*${sizePart}${pricePart} from your catalog.`;
+      : `Hi Ryker! I'd like to enquire about *${item.name}*${colorPart}${sizePart}${pricePart} from your catalog.`;
   }
 
-  function whatsappLink(item, soldOut, selectedSize) {
+  function whatsappLink(item, soldOut, selectedSize, selectedColor) {
     const phone = settings.whatsappNumber || '254714672436';
-    const body = enquireBody(item, soldOut, selectedSize);
+    const body = enquireBody(item, soldOut, selectedSize, selectedColor);
     // Append the item's /p/<id> share page — WhatsApp previews it as a card with the
     // product photo + name + price. Still opens straight to WhatsApp (no app picker).
     const shareUrl = item.id ? `${API_BASE}/p/${encodeURIComponent(item.id)}` : '';
@@ -406,6 +416,10 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
       const onSale = isOnSale(item);
       const avail = availSizes(item);
       const pickRequired = !soldOut && avail.length > 1;
+      const cols = itemColors(item);
+      const colorsHtml = (!soldOut && cols.length)
+        ? `<div class="color-chips"><span class="color-label">Colour:</span>${cols.map(c => `<button type="button" class="color-chip" data-color="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('')}</div>`
+        : '';
       const sizesHtml = avail.length
         ? `<div class="size-chips${pickRequired ? ' pickable' : ''}">${avail.map(s => `<button type="button" class="size-chip" data-size="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join('')}${pickRequired ? '<span class="size-hint">Pick a size first</span>' : ''}</div>`
         : '';
@@ -439,6 +453,7 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
         <div class="card-body">
           <h3 class="card-title">${escapeHtml(item.name)}</h3>
           <p class="card-desc">${escapeHtml(item.description || '')}</p>
+          ${colorsHtml}
           ${sizesHtml}
           <div class="card-price-row">
             ${onSale
@@ -607,6 +622,16 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
       chipsRow?.classList.remove('prompted');
       return;
     }
+    // Colour-chip click — toggle select (single per card), deselect siblings
+    const colorChip = e.target.closest('.color-chip[data-color]');
+    if (colorChip) {
+      e.preventDefault(); e.stopPropagation();
+      const card = colorChip.closest('.card');
+      const wasSel = colorChip.classList.contains('selected');
+      card.querySelectorAll('.color-chip').forEach(c => c.classList.remove('selected'));
+      if (!wasSel) colorChip.classList.add('selected');
+      return;
+    }
     // Enquire click — enforce size pick when needed
     const enquire = e.target.closest('.btn-card.primary');
     if (enquire) {
@@ -630,8 +655,13 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
           setTimeout(() => chips?.classList.remove('shake'), 600);
           return;
         }
-        // Override the href with the size-specific URL
-        enquire.href = whatsappLink(item, false, selected.dataset.size);
+      }
+      // Rebuild the WhatsApp link with whatever size + colour the buyer picked.
+      // Colour is optional (not gated) — included only if selected.
+      if (!soldOut) {
+        const selSizeEl = card.querySelector('.size-chip.selected');
+        const selColorEl = card.querySelector('.color-chip.selected');
+        enquire.href = whatsappLink(item, false, selSizeEl ? selSizeEl.dataset.size : null, selColorEl ? selColorEl.dataset.color : null);
       }
       track('itemEnquiries', id);
       gaEvent('enquire', { item_id: id });

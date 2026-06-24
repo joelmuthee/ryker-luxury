@@ -17,7 +17,7 @@
 <meta name="theme-color" content="#3d2817">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20260622loyalty">
+<link rel="stylesheet" href="styles.css?v=20260624colors">
 <script src="https://www.google.com/recaptcha/enterprise.js?render=6LeDBFwpAAAAAJe8ux9-imrqZ2ueRsEtdiWoDDpX" async defer></script>
 </head>
 <body style="background:#f8f6f2;">
@@ -488,6 +488,11 @@
     </div>
 
     <div class="field">
+      <label>Colours <small style="font-weight:400;color:#999;">— optional. Separate with commas, e.g. Black, White, Tan. Shoppers pick one when they enquire.</small></label>
+      <input id="colorsInput" type="text" placeholder="e.g. Black, White, Tan" autocomplete="off">
+    </div>
+
+    <div class="field">
       <label>Description</label>
       <textarea id="descInput" placeholder="Tap 'Suggest' or write your own..."></textarea>
       <button class="btn-admin" id="aiBtn" type="button" style="margin-top:8px;">✨ Suggest description</button>
@@ -936,6 +941,6 @@
   </div>
 </div>
 
-<script src="admin.js?v=20260622loyalty"></script>
+<script src="admin.js?v=20260624colors"></script>
 </body>
 </html>

@@ -541,6 +541,18 @@ img { max-width: 100%; display: block; }
 .size-chips.prompted .size-hint { display: inline; }
 .size-chips.pickable:has(.size-chip.selected) .size-hint { display: none; }
 .size-chips.shake { animation: chipShake 0.45s ease; }
+
+/* Colour variants — optional per-item list; selectable, flows into the enquiry */
+.color-chips { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-bottom: 8px; }
+.color-label { font-size: 11px; font-weight: 600; color: var(--ink-faint, #8a7a66); letter-spacing: 0.04em; margin-right: 2px; }
+.color-chip {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
+  font-size: 11px; font-weight: 600; padding: 4px 11px;
+  color: var(--ink); letter-spacing: 0.02em;
+  font-family: inherit; cursor: pointer; transition: 0.15s;
+}
+.color-chip:hover { border-color: var(--gold); background: var(--gold-light); color: var(--ink); }
+.color-chip.selected { background: var(--ink); color: var(--gold-light); border-color: var(--ink); }
 @keyframes chipShake {
   0%, 100% { transform: translateX(0); }
   20% { transform: translateX(-5px); }
