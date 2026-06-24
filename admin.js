@@ -880,6 +880,8 @@ function openSaleModal(id) {
   saleQtyInput.value = 1;
   // Default to the markdown price if the item is on sale, so the recorded sale captures the discount.
   salePriceInput.value = (bag.salePrice > 0 && bag.salePrice < bag.price) ? bag.salePrice : bag.price;
+  salePriceInput.dataset.list = salePriceInput.value;
+  document.getElementById('saleDiscountInput').value = '';
   document.getElementById('salePaidInput').value = '';
   document.getElementById('salePaidHint').style.display = 'none';
   document.getElementById('salePaidNone').classList.remove('active');
@@ -901,7 +903,9 @@ async function recordSale(withBuyer) {
   if (!curBag) return;
   const size = saleSizeInput.value;
   const qty = parseInt(saleQtyInput.value, 10) || 1;
-  const salePrice = parseInt(salePriceInput.value, 10) || curBag.price;
+  const salePrice = parseInt(salePriceInput.value, 10) || curBag.price; // already the discounted (net) price
+  const discount = Math.max(0, parseInt(document.getElementById('saleDiscountInput').value, 10) || 0);
+  const listPrice = parseInt(salePriceInput.dataset.list, 10) || (salePrice + discount);
   const payMethod = document.querySelector('#saleModalPay .pos-pay-btn.active')?.dataset.pay || 'mpesa';
   const total = salePrice * qty;
   // Skip path = quick full-payment sale; only the "with buyer" path can leave a balance.
@@ -918,6 +922,7 @@ async function recordSale(withBuyer) {
     size,
     qty,
     salePrice,
+    ...(discount > 0 ? { discount, listPrice } : {}),
     amountPaid,
     paymentMethod: payMethod,
     channel: 'shop',
@@ -948,7 +953,7 @@ async function recordSale(withBuyer) {
     showToast(`Sale recorded — ${qty}× ${size} sold.`);
     if (withBuyer && (sale.buyerName || sale.buyerPhone)) sendBuyerToGHL(soldBag, sale);
     // Offer a receipt (same panel the Sell-in-store flow uses).
-    lastPosSale = { name: soldBag ? soldBag.name : '', size, qty, amount: salePrice, paid: amountPaid, balance, paymentMethod: sale.paymentMethod, buyerName: sale.buyerName, buyerPhone: sale.buyerPhone, soldAt: sale.soldAt };
+    lastPosSale = { name: soldBag ? soldBag.name : '', size, qty, amount: salePrice, paid: amountPaid, balance, discount, listPrice, paymentMethod: sale.paymentMethod, buyerName: sale.buyerName, buyerPhone: sale.buyerPhone, soldAt: sale.soldAt };
     showPosReceipt(lastPosSale);
     document.getElementById('posDash').scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (err) { showToast('Error: ' + err.message); }
@@ -2576,6 +2581,32 @@ document.getElementById('posPaidNone')?.addEventListener('click', () => {
   syncPaid('posPrice', 'posQty', 'posPaid', 'posPaidHint', 'posPaidNone');
 });
 
+// Discount: subtract from the list price (held in dataset.list) and write the net
+// into the Selling price field, so the RECORDED salePrice is the discounted price
+// — no phantom debt. Then re-run syncPaid so "paid in full" reflects the new total.
+function applyDiscount(priceId, discId, qtyId, paidId, hintId, btnId) {
+  const priceEl = document.getElementById(priceId);
+  const discEl = document.getElementById(discId);
+  if (!priceEl || !discEl) return;
+  const list = parseInt(priceEl.dataset.list || priceEl.value, 10) || 0;
+  const disc = Math.max(0, parseInt(discEl.value, 10) || 0);
+  priceEl.value = Math.max(0, list - disc);
+  syncPaid(priceId, qtyId, paidId, hintId, btnId);
+}
+// Manual price edits rebaseline the list price, but only while no discount is applied.
+function rebaseList(priceId, discId) {
+  const priceEl = document.getElementById(priceId);
+  const discEl = document.getElementById(discId);
+  if (!priceEl || !discEl) return;
+  if ((discEl.value || '').trim() === '' || parseInt(discEl.value, 10) === 0) priceEl.dataset.list = priceEl.value;
+}
+document.getElementById('saleDiscountInput')?.addEventListener('input',
+  () => applyDiscount('salePriceInput', 'saleDiscountInput', 'saleQtyInput', 'salePaidInput', 'salePaidHint', 'salePaidNone'));
+document.getElementById('posDiscount')?.addEventListener('input',
+  () => applyDiscount('posPrice', 'posDiscount', 'posQty', 'posPaid', 'posPaidHint', 'posPaidNone'));
+document.getElementById('salePriceInput')?.addEventListener('input', () => rebaseList('salePriceInput', 'saleDiscountInput'));
+document.getElementById('posPrice')?.addEventListener('input', () => rebaseList('posPrice', 'posDiscount'));
+
 // ====== WHATSAPP BROADCAST ======
 let broadcastSelectedIds = [];
 let broadcastRecipientsState = {};  // phone -> { name, included }
@@ -3239,7 +3270,10 @@ function posSelectItem(id) {
   if (inStock.length) inStock.forEach(([sz, q]) => { const o = document.createElement('option'); o.value = sz; o.textContent = `${sz} (${q} in stock)`; sizeSel.appendChild(o); });
   else { const o = document.createElement('option'); o.value = 'One size'; o.textContent = 'One size'; sizeSel.appendChild(o); }
   document.getElementById('posQty').value = 1;
-  document.getElementById('posPrice').value = (bag.salePrice > 0 && bag.salePrice < bag.price) ? bag.salePrice : (bag.price || '');
+  const posPriceEl = document.getElementById('posPrice');
+  posPriceEl.value = (bag.salePrice > 0 && bag.salePrice < bag.price) ? bag.salePrice : (bag.price || '');
+  posPriceEl.dataset.list = posPriceEl.value;
+  document.getElementById('posDiscount').value = '';
   document.getElementById('posDate').value = todayInputValue();
   document.getElementById('posChosen').innerHTML = `Selling <strong>${escapeHtml(bag.name)}</strong> · <button type="button" id="posClearItem">change</button>`;
   document.getElementById('posChosen').style.display = '';
@@ -3268,6 +3302,7 @@ function posReceiptText(s) {
     `${s.name} (Size ${s.size}) x${s.qty}`,
     `Total: ${fmtKsh(total)}. Paid by ${s.paymentMethod === 'mpesa' ? 'M-Pesa' : 'Cash'}.`,
   ];
+  if (s.discount > 0) lines.push(`Discount: ${fmtKsh(s.discount)} off (was ${fmtKsh((s.listPrice || s.amount) * s.qty)}).`);
   if (s.balance > 0) lines.push(`Paid now: ${fmtKsh(s.paid)}. Balance owing: ${fmtKsh(s.balance)}.`);
   lines.push(`Thank you for shopping with us. Legend Valley Business Park, Gitanga Road, Nairobi.`);
   return lines.join('\n');
@@ -3279,9 +3314,10 @@ function showPosReceipt(s) {
   document.getElementById('posItemSearch').value = '';
   const total = s.amount * s.qty;
   const pay = s.paymentMethod === 'mpesa' ? 'M-Pesa' : 'Cash';
+  const discLine = s.discount > 0 ? `<br><span style="color:#1a7a3a;">Discount ${fmtKsh(s.discount)} off (was ${fmtKsh((s.listPrice || s.amount) * s.qty)})</span>` : '';
   const balLine = s.balance > 0 ? `<br><span class="owed-amount">Paid ${fmtKsh(s.paid)} · still owes ${fmtKsh(s.balance)}</span>` : '';
   document.getElementById('posReceiptSummary').innerHTML =
-    `<strong>${escapeHtml(s.name)}</strong> · Size ${escapeHtml(s.size)} · ${s.qty} item(s)<br>${fmtKsh(total)} · paid by ${pay}${balLine}`;
+    `<strong>${escapeHtml(s.name)}</strong> · Size ${escapeHtml(s.size)} · ${s.qty} item(s)<br>${fmtKsh(total)} · paid by ${pay}${discLine}${balLine}`;
   const wa = document.getElementById('posWaReceiptBtn');
   if (s.buyerPhone && s.buyerPhone.replace(/[^0-9]/g, '').length >= 9) {
     wa.href = `https://wa.me/${posWaPhone(s.buyerPhone)}?text=${encodeURIComponent(posReceiptText(s))}`;
@@ -3344,7 +3380,9 @@ async function recordPosSale() {
   const phone = document.getElementById('posBuyerPhone').value.trim().replace(/[^0-9+]/g, '');
   const note = document.getElementById('posNotes').value.trim();
   const soldAt = soldAtFromDateInput(document.getElementById('posDate').value);
-  const amount = isNaN(priceRaw) ? (bags.find(b => b.id === targetId)?.price || 0) : priceRaw;
+  const amount = isNaN(priceRaw) ? (bags.find(b => b.id === targetId)?.price || 0) : priceRaw; // already discounted (net)
+  const discount = Math.max(0, parseInt(document.getElementById('posDiscount').value, 10) || 0);
+  const listPrice = parseInt(document.getElementById('posPrice').dataset.list, 10) || (amount + discount);
   const total = amount * qty;
   const paidRaw = (document.getElementById('posPaid').value || '').trim();
   const amountPaid = paidRaw === '' ? total : Math.min(total, Math.max(0, parseInt(paidRaw, 10) || 0));
@@ -3360,7 +3398,7 @@ async function recordPosSale() {
       if (!bag) throw new Error('Item no longer exists — refresh admin');
       if (bag.stock && bag.stock[size] !== undefined) bag.stock[size] = Math.max(0, bag.stock[size] - qty);
       if (!bag.sales) bag.sales = [];
-      bag.sales.push({ size, qty, salePrice: amount, amountPaid, paymentMethod: posPayMethod, channel: 'shop', buyerName: name, buyerPhone: phone, notes: note, soldAt });
+      bag.sales.push({ size, qty, salePrice: amount, ...(discount > 0 ? { discount, listPrice } : {}), amountPaid, paymentMethod: posPayMethod, channel: 'shop', buyerName: name, buyerPhone: phone, notes: note, soldAt });
       soldName = bag.name;
       if (phone.replace(/[^0-9]/g, '').length >= 9) {
         if (!Array.isArray(clients)) clients = [];
@@ -3370,7 +3408,7 @@ async function recordPosSale() {
         else clients.push({ id: 'c_' + Date.now(), name: name || '', phone, note, createdAt: soldAt });
       }
     });
-    lastPosSale = { name: soldName, size, qty, amount, paid: amountPaid, balance, paymentMethod: posPayMethod, buyerName: name, buyerPhone: phone, soldAt };
+    lastPosSale = { name: soldName, size, qty, amount, paid: amountPaid, balance, discount, listPrice, paymentMethod: posPayMethod, buyerName: name, buyerPhone: phone, soldAt };
     renderList(); renderDashboard(); renderInventory();
     if (typeof renderClients === 'function') renderClients();
     if (typeof renderOwed === 'function') renderOwed();
