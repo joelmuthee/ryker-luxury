@@ -553,6 +553,22 @@ img { max-width: 100%; display: block; }
 }
 .color-chip:hover { border-color: var(--gold); background: var(--gold-light); color: var(--ink); }
 .color-chip.selected { background: var(--ink); color: var(--gold-light); border-color: var(--ink); }
+.color-chip.soldout { opacity: 0.45; text-decoration: line-through; cursor: not-allowed; }
+.color-chip.soldout:hover { border-color: var(--line); background: var(--surface); color: var(--ink); }
+.color-pick-hint { font-size: 11px; color: var(--ink-faint); font-style: italic; margin: 4px 0 0; }
+.color-chips.shake { animation: chipShake 0.45s ease; }
+/* Stock per colour & size matrix */
+.cstk-sizes { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 4px 0 8px; }
+.cstk-sizes-lbl { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.cstk-sizes input { flex: 1 1 160px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; }
+.cstk-sizes .btn-admin { font-size: 12px; padding: 8px 14px; }
+.cstk-grid-wrap { overflow-x: auto; }
+.cstk-table { border-collapse: collapse; font-size: 13px; }
+.cstk-table th, .cstk-table td { border: 1px solid var(--line); padding: 4px; text-align: center; }
+.cstk-table thead th { background: var(--surface); font-weight: 700; color: var(--ink-soft); }
+.cstk-table .cstk-color { font-weight: 700; text-align: left; padding: 4px 10px; background: var(--surface); white-space: nowrap; }
+.cstk-table .cstk-qty { width: 52px; padding: 6px 4px; border: 1px solid var(--line); border-radius: 6px; text-align: center; font-size: 13px; }
+.cstk-table .cstk-qty:focus { outline: none; border-color: var(--gold); }
 @keyframes chipShake {
   0%, 100% { transform: translateX(0); }
   20% { transform: translateX(-5px); }

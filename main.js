@@ -166,6 +166,22 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     if (!Array.isArray(item.colors)) return [];
     return item.colors.map(c => String(c).trim()).filter(Boolean);
   }
+  // Per-colour × size stock (the accurate inventory model). When present, the
+  // size chips follow the chosen colour and sold-out colours are disabled.
+  function itemHasColorStock(item) {
+    return Array.isArray(item.colors) && item.colors.length > 0 && item.stockByColor && typeof item.stockByColor === 'object';
+  }
+  function colorAvailSizes(item, color) {
+    return Object.entries((item.stockByColor || {})[color] || {})
+      .filter(([, q]) => (q || 0) > 0).map(([s]) => s).filter(s => s !== 'One Size').sort(sortSize);
+  }
+  function colorInStock(item, color) {
+    return Object.values((item.stockByColor || {})[color] || {}).some(q => (q || 0) > 0);
+  }
+  function sizeChipButtons(sizes) {
+    return sizes.map(s => `<button type="button" class="size-chip" data-size="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join('')
+      + (sizes.length > 1 ? '<span class="size-hint">Pick a size first</span>' : '');
+  }
 
   function enquireBody(item, soldOut, selectedSize, selectedColor) {
     const avail = availSizes(item);
@@ -417,12 +433,18 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
       const avail = availSizes(item);
       const pickRequired = !soldOut && avail.length > 1;
       const cols = itemColors(item);
+      const colorStock = itemHasColorStock(item);
       const colorsHtml = (!soldOut && cols.length)
-        ? `<div class="color-chips"><span class="color-label">Colour:</span>${cols.map(c => `<button type="button" class="color-chip" data-color="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('')}</div>`
+        ? `<div class="color-chips"><span class="color-label">Colour:</span>${cols.map(c => {
+            const out = colorStock && !colorInStock(item, c);
+            return `<button type="button" class="color-chip${out ? ' soldout' : ''}" data-color="${escapeHtml(c)}"${out ? ' disabled' : ''}>${escapeHtml(c)}${out ? ' · sold out' : ''}</button>`;
+          }).join('')}</div>${colorStock ? '<p class="color-pick-hint">Pick a colour to see sizes</p>' : ''}`
         : '';
-      const sizesHtml = avail.length
-        ? `<div class="size-chips${pickRequired ? ' pickable' : ''}">${avail.map(s => `<button type="button" class="size-chip" data-size="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join('')}${pickRequired ? '<span class="size-hint">Pick a size first</span>' : ''}</div>`
-        : '';
+      const sizesHtml = colorStock
+        ? '<div class="size-chips pickable" data-color-driven="1"></div>'
+        : (avail.length
+          ? `<div class="size-chips${pickRequired ? ' pickable' : ''}">${sizeChipButtons(avail)}</div>`
+          : '');
       const catBadge = item.category ? `<span class="badge-cat">${escapeHtml(item.category)}</span>` : '';
       const isNewItem = isNew(item);
       const totalUnits = totalStock(item);
@@ -626,10 +648,23 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     const colorChip = e.target.closest('.color-chip[data-color]');
     if (colorChip) {
       e.preventDefault(); e.stopPropagation();
+      if (colorChip.disabled) return;
       const card = colorChip.closest('.card');
       const wasSel = colorChip.classList.contains('selected');
       card.querySelectorAll('.color-chip').forEach(c => c.classList.remove('selected'));
       if (!wasSel) colorChip.classList.add('selected');
+      // Colour-stock items: rebuild the size chips for the chosen colour.
+      const sizeWrap = card.querySelector('.size-chips[data-color-driven]');
+      if (sizeWrap) {
+        const wrap = card.querySelector('[data-id]');
+        const item = wrap && items.find(i => i.id === wrap.dataset.id);
+        if (item) {
+          sizeWrap.classList.remove('prompted', 'shake');
+          sizeWrap.innerHTML = (!wasSel) ? sizeChipButtons(colorAvailSizes(item, colorChip.dataset.color)) : '';
+          const hint = card.querySelector('.color-pick-hint');
+          if (hint) hint.style.display = (!wasSel) ? 'none' : '';
+        }
+      }
       return;
     }
     // Enquire click — enforce size pick when needed
@@ -643,8 +678,25 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
       if (!item) return;
       const soldOut = isSoldOut(item);
       const avail = availSizes(item);
-      // Require size selection when multiple sizes exist and item isn't sold out
-      if (!soldOut && avail.length > 1) {
+      // Colour-stock items: require a colour first, then a size (from that colour).
+      if (!soldOut && itemHasColorStock(item)) {
+        if (!card.querySelector('.color-chip.selected')) {
+          e.preventDefault();
+          showToast('Pick a colour first');
+          const cc = card.querySelector('.color-chips');
+          cc?.classList.add('shake'); setTimeout(() => cc?.classList.remove('shake'), 600);
+          return;
+        }
+        const sizeChips = card.querySelectorAll('.size-chips .size-chip');
+        if (sizeChips.length > 1 && !card.querySelector('.size-chip.selected')) {
+          e.preventDefault();
+          showToast('Pick your size first to continue');
+          const chips = card.querySelector('.size-chips');
+          chips?.classList.add('prompted'); chips?.classList.add('shake');
+          setTimeout(() => chips?.classList.remove('shake'), 600);
+          return;
+        }
+      } else if (!soldOut && avail.length > 1) {
         const selected = card.querySelector('.size-chip.selected');
         if (!selected) {
           e.preventDefault();
