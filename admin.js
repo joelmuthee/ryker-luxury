@@ -2451,19 +2451,39 @@ function acRenderResults(q) {
     : '<div class="client-item-empty">No items match.</div>';
   box.style.display = '';
 }
+// Fill the Add-client size dropdown — colour-aware when a colour is chosen.
+function acFillSizes(bag, color) {
+  const sizeSel = document.getElementById('addClientSize');
+  sizeSel.innerHTML = '';
+  let inStock;
+  if (color && itemHasColorStock(bag)) {
+    inStock = colorAvailSizes(bag, color).map(sz => [sz, bag.stockByColor[color][sz]]);
+  } else {
+    inStock = Object.entries(bag.stock || {}).filter(([, q]) => q > 0);
+  }
+  if (inStock.length) {
+    inStock.forEach(([sz, q]) => { const o = document.createElement('option'); o.value = sz; o.textContent = `${sz} (${q} in stock)`; sizeSel.appendChild(o); });
+  } else {
+    const o = document.createElement('option'); o.value = 'One size'; o.textContent = 'One size'; sizeSel.appendChild(o);
+  }
+}
 function acSelectItem(id) {
   const bag = bags.find(b => b.id === id);
   if (!bag) return;
   acItemId = id;
   document.getElementById('addClientItemSearch').value = bag.name;
   document.getElementById('addClientItemResults').style.display = 'none';
-  const sizeSel = document.getElementById('addClientSize');
-  sizeSel.innerHTML = '';
-  const inStock = Object.entries(bag.stock || {}).filter(([, q]) => q > 0);
-  if (inStock.length) {
-    inStock.forEach(([sz, q]) => { const o = document.createElement('option'); o.value = sz; o.textContent = `${sz} (${q} in stock)`; sizeSel.appendChild(o); });
+  const colorField = document.getElementById('addClientColorField');
+  const colorSel = document.getElementById('addClientColor');
+  const cols = itemColors(bag);
+  if (cols.length) {
+    const opts = itemHasColorStock(bag) ? colorsWithStock(bag) : cols;
+    colorSel.innerHTML = opts.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    colorField.style.display = '';
+    acFillSizes(bag, opts[0] || '');
   } else {
-    const o = document.createElement('option'); o.value = 'One size'; o.textContent = 'One size'; sizeSel.appendChild(o);
+    colorField.style.display = 'none';
+    acFillSizes(bag, '');
   }
   document.getElementById('addClientQty').value = 1;
   document.getElementById('addClientPrice').value = (bag.salePrice > 0 && bag.salePrice < bag.price) ? bag.salePrice : bag.price;
@@ -2503,6 +2523,10 @@ document.getElementById('addClientItemResults')?.addEventListener('click', e => 
 document.getElementById('addClientChosen')?.addEventListener('click', e => {
   if (e.target.id === 'addClientClearItem') acClearItem();
 });
+document.getElementById('addClientColor')?.addEventListener('change', e => {
+  const bag = bags.find(b => b.id === acItemId);
+  if (bag) acFillSizes(bag, e.target.value);
+});
 document.getElementById('addClientSaveBtn')?.addEventListener('click', async () => {
   const name = document.getElementById('addClientName').value.trim();
   const phone = document.getElementById('addClientPhone').value.trim().replace(/[^0-9+]/g, '');
@@ -2510,11 +2534,12 @@ document.getElementById('addClientSaveBtn')?.addEventListener('click', async () 
   if (!name) { showToast('Enter a name.'); return; }
   if (phone.replace(/[^0-9]/g, '').length < 9) { showToast('Enter a valid phone number.'); return; }
   const itemId = acItemId;
-  let size, qty, salePrice;
+  let size, qty, salePrice, color = '';
   if (itemId) {
     size = document.getElementById('addClientSize').value;
     qty = parseInt(document.getElementById('addClientQty').value, 10) || 1;
     salePrice = parseInt(document.getElementById('addClientPrice').value, 10);
+    if (document.getElementById('addClientColorField').style.display !== 'none') color = document.getElementById('addClientColor').value;
   }
   const btn = document.getElementById('addClientSaveBtn');
   btn.disabled = true;
@@ -2528,9 +2553,14 @@ document.getElementById('addClientSaveBtn')?.addEventListener('click', async () 
       if (itemId) {
         const bag = bags.find(b => b.id === itemId);
         if (!bag) throw new Error('Item no longer exists — refresh admin');
-        if (bag.stock && bag.stock[size] !== undefined) bag.stock[size] = Math.max(0, bag.stock[size] - qty);
+        if (color && itemHasColorStock(bag) && bag.stockByColor[color]?.[size] !== undefined) {
+          bag.stockByColor[color][size] = Math.max(0, bag.stockByColor[color][size] - qty);
+          bag.stock = aggregateStock(bag.stockByColor);
+        } else if (bag.stock && bag.stock[size] !== undefined) {
+          bag.stock[size] = Math.max(0, bag.stock[size] - qty);
+        }
         if (!bag.sales) bag.sales = [];
-        bag.sales.push({ size, qty, salePrice: salePrice || bag.price, buyerName: name, buyerPhone: phone, notes: note, soldAt: new Date().toISOString() });
+        bag.sales.push({ size, color, qty, salePrice: salePrice || bag.price, buyerName: name, buyerPhone: phone, notes: note, soldAt: new Date().toISOString() });
       }
     });
     closeAddClient();
