@@ -716,7 +716,7 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
         enquire.href = whatsappLink(item, false, selSizeEl ? selSizeEl.dataset.size : null, selColorEl ? selColorEl.dataset.color : null);
       }
       track('itemEnquiries', id);
-      gaEvent('enquire', { item_id: id });
+      gaEvent('whatsapp_click', { item_id: id });
       // Enquire opens WhatsApp directly via the wa.me href (anchor, target=_blank).
       // No native share sheet — the OS "select an app" chooser confused buyers.
     }
