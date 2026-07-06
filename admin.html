@@ -591,10 +591,10 @@
       <label>Stock per colour &amp; size <small style="font-weight:400;color:#999;">— this item has colours, so set how many of each size you have in each colour. Selling deducts the exact colour and size.</small></label>
       <div class="cstk-sizes">
         <span class="cstk-sizes-lbl">Sizes it comes in:</span>
-        <input id="cstkSizesInput" type="text" placeholder="e.g. M, L, XL or 30, 32, 34" autocomplete="off">
+        <input id="cstkSizesInput" type="text" placeholder="e.g. M L XL or 30 32 34" autocomplete="off">
         <button class="btn-admin" id="cstkBuildBtn" type="button">Build grid</button>
       </div>
-      <p class="stock-hint">Type the sizes (comma-separated), tap <strong>Build grid</strong>, then fill the quantity for each colour and size. Leave blank or 0 for ones you don't have.</p>
+      <p class="stock-hint">Type the sizes with a space or comma between them, tap <strong>Build grid</strong>, then fill the quantity for each colour and size. Leave blank or 0 for ones you don't have.</p>
       <div id="cstkGrid" class="cstk-grid-wrap"></div>
     </div>
 
@@ -966,6 +966,6 @@
   </div>
 </div>
 
-<script src="admin.js?v=20260629fold"></script>
+<script src="admin.js?v=20260706sizesep"></script>
 </body>
 </html>
