@@ -973,13 +973,16 @@ export default {
       const mp = (env.MASTER_PASSWORD || "").trim();
       const mt = (env.MASTER_TOKEN || "").trim();
       if ((mp && pw === mp) || (mt && pw === mt)) return json({ ok: true, source: "master" });
-      const stored = await env.BAGS.get("adminpass");
       const hashHex = await sha256Hex(pw);
-      if (stored) {
-        return json({ ok: stored === hashHex, source: stored === hashHex ? "owner" : null });
-      }
+      const stored = await env.BAGS.get("adminpass");
       const FALLBACK_OWNER_PASSWORD = "ryker123";
-      return json({ ok: pw === FALLBACK_OWNER_PASSWORD, source: pw === FALLBACK_OWNER_PASSWORD ? "owner" : null });
+      const ownerOk = stored ? (stored === hashHex) : (pw === FALLBACK_OWNER_PASSWORD);
+      if (ownerOk) return json({ ok: true, source: "owner" });
+      // Assistant (staff) login — limited role, set by the owner. Can sell and
+      // manage stock but the admin UI hides money/report views for this role.
+      const staff = await env.BAGS.get("staffpass");
+      if (staff && staff === hashHex) return json({ ok: true, source: "assistant" });
+      return json({ ok: false, source: null });
     }
 
     if (request.method === "POST" && path === "/api/set-password") {
@@ -999,6 +1002,28 @@ export default {
       }
       if (!ok) return json({ error: "current password is wrong" }, 401);
       await env.BAGS.put("adminpass", await sha256Hex(next));
+      return json({ ok: true });
+    }
+
+    // Set (or remove) the assistant/staff password. OWNER-authenticated: `current`
+    // must be a valid owner or master password. Empty `next` removes staff login.
+    if (request.method === "POST" && path === "/api/set-staff-password") {
+      let body;
+      try { body = await request.json(); } catch { return json({ error: "invalid json" }, 400); }
+      const current = String(body.current || "");
+      const next = String(body.next || "");
+      const mp = (env.MASTER_PASSWORD || "").trim();
+      const mt = (env.MASTER_TOKEN || "").trim();
+      let ok = (mp && current === mp) || (mt && current === mt);
+      if (!ok) {
+        const stored = await env.BAGS.get("adminpass");
+        const curHash = await sha256Hex(current);
+        ok = stored ? stored === curHash : current === "ryker123";
+      }
+      if (!ok) return json({ error: "current password is wrong" }, 401);
+      if (!next) { await env.BAGS.delete("staffpass"); return json({ ok: true, removed: true }); }
+      if (next.length < 4) return json({ error: "staff password must be at least 4 characters" }, 400);
+      await env.BAGS.put("staffpass", await sha256Hex(next));
       return json({ ok: true });
     }
 

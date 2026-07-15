@@ -17,7 +17,7 @@
 <meta name="theme-color" content="#3d2817">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20260706gridfix">
+<link rel="stylesheet" href="styles.css?v=20260715staff">
 <script src="https://www.google.com/recaptcha/enterprise.js?render=6LeDBFwpAAAAAJe8ux9-imrqZ2ueRsEtdiWoDDpX" async defer></script>
 </head>
 <body style="background:#f8f6f2;">
@@ -41,6 +41,7 @@
     <h1>Ryker Luxury Admin</h1>
     <div class="admin-actions">
       <a class="btn-admin" href="index.html" target="_blank">View store →</a>
+      <button class="btn-admin" id="staffAccessBtn" type="button">👤 Staff access</button>
       <button class="btn-admin" id="changePasswordBtn" type="button">🔑 Change password</button>
       <button class="btn-admin danger" id="logoutBtn">Logout</button>
     </div>
@@ -507,7 +508,7 @@
       <input id="itemSalePriceInput" type="number" min="0" step="50" placeholder="e.g. 4500">
     </div>
 
-    <div class="field">
+    <div class="field" id="costField">
       <label>Buying price (Ksh) <small style="font-weight:400;color:#999;">(optional) — what you paid per unit. Never shown to buyers, just for your profit tracking.</small></label>
       <input id="costInput" type="number" min="0" step="50" placeholder="e.g. 2000">
     </div>
@@ -967,6 +968,28 @@
   </div>
 </div>
 
-<script src="admin.js?v=20260706gridfix"></script>
+<!-- STAFF ACCESS — owner sets a separate password for a helper who can sell and
+     manage stock but never sees sales totals, profit, or other money reports. -->
+<div id="staffAccessModal" class="modal" style="display:none;">
+  <div class="modal-card">
+    <h3>Staff access</h3>
+    <p class="sub">Give a helper their own password. They sign in at <strong>rykerluxury.co.ke/staff</strong> with it. They can sell, add and restock items, and save customers, but they will NOT see sales totals, profit, inventory value, money owed, expenses or reports. Leave the new password blank and tap Save to switch staff access off.</p>
+    <div class="field">
+      <label>Your owner password <small style="font-weight:400;color:#999;">to confirm it's you</small></label>
+      <input id="saCurrent" type="password" autocomplete="current-password">
+    </div>
+    <div class="field">
+      <label>Staff password <small style="font-weight:400;color:#999;">at least 4 characters — share this with your helper</small></label>
+      <input id="saNew" type="text" autocomplete="off" placeholder="e.g. sell2026">
+    </div>
+    <p id="saError" style="color:#b00020;font-size:13px;display:none;margin:8px 0 0;"></p>
+    <div class="admin-actions" style="margin-top:18px;">
+      <button class="btn-admin primary" id="saSaveBtn">Save staff password</button>
+      <button class="btn-admin" id="saCancelBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="admin.js?v=20260715staff"></script>
 </body>
 </html>

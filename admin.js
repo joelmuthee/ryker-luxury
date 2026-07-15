@@ -29,6 +29,10 @@ const loginError = document.getElementById('loginError');
 
 function checkAuth() {
   if (sessionStorage.getItem('ryker_auth') === '1') {
+    // Role gate: an 'assistant' can sell + manage stock but the admin hides all
+    // money/report views (sales totals, profit, inventory value, owed, etc.).
+    const role = sessionStorage.getItem('ryker_role') || 'owner';
+    document.body.classList.toggle('role-assistant', role === 'assistant');
     loginScreen.style.display = 'none';
     dashboard.style.display = 'block';
     init();
@@ -45,16 +49,22 @@ async function login() {
       body: JSON.stringify({ password: pw })
     });
     const j = await res.json();
-    if (j.ok) { sessionStorage.setItem('ryker_auth', '1'); checkAuth(); }
+    if (j.ok) {
+      sessionStorage.setItem('ryker_auth', '1');
+      sessionStorage.setItem('ryker_role', j.source === 'assistant' ? 'assistant' : 'owner');
+      checkAuth();
+    }
     else { loginError.style.display = 'block'; }
   } catch (e) {
-    // Network fallback so a CF outage doesn't lock the owner out.
-    if (pw === ADMIN_PASSWORD) { sessionStorage.setItem('ryker_auth', '1'); checkAuth(); }
+    // Network fallback so a CF outage doesn't lock the owner out. Only the owner
+    // password is known client-side, so the fallback always grants the owner role.
+    if (pw === ADMIN_PASSWORD) { sessionStorage.setItem('ryker_auth', '1'); sessionStorage.setItem('ryker_role', 'owner'); checkAuth(); }
     else { loginError.style.display = 'block'; }
   }
 }
 document.getElementById('logoutBtn').addEventListener('click', () => {
   sessionStorage.removeItem('ryker_auth');
+  sessionStorage.removeItem('ryker_role');
   location.reload();
 });
 
@@ -99,6 +109,48 @@ document.getElementById('cpSaveBtn')?.addEventListener('click', async () => {
     err.style.display = 'block';
   } finally {
     btn.disabled = false; btn.textContent = 'Change password';
+  }
+});
+
+// ====== STAFF ACCESS (owner sets a limited "assistant" password) ======
+function _closeStaffAccess() { const m = document.getElementById('staffAccessModal'); if (m) m.style.display = 'none'; }
+document.getElementById('staffAccessBtn')?.addEventListener('click', () => {
+  const m = document.getElementById('staffAccessModal');
+  if (!m) return;
+  ['saCurrent', 'saNew'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('saError').style.display = 'none';
+  m.style.display = 'flex';
+  document.getElementById('saCurrent')?.focus();
+});
+document.getElementById('saCancelBtn')?.addEventListener('click', _closeStaffAccess);
+document.getElementById('staffAccessModal')?.addEventListener('click', e => { if (e.target.id === 'staffAccessModal') _closeStaffAccess(); });
+document.getElementById('saSaveBtn')?.addEventListener('click', async () => {
+  const cur = document.getElementById('saCurrent').value;
+  const nw = document.getElementById('saNew').value.trim();
+  const err = document.getElementById('saError');
+  err.style.display = 'none';
+  if (!cur) { err.textContent = 'Enter your owner password to confirm.'; err.style.display = 'block'; return; }
+  if (nw && nw.length < 4) { err.textContent = 'Staff password must be at least 4 characters (or leave blank to switch it off).'; err.style.display = 'block'; return; }
+  const btn = document.getElementById('saSaveBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const res = await fetch(`${API_BASE}/api/set-staff-password`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ current: cur, next: nw })
+    });
+    const j = await res.json();
+    if (j.ok) {
+      _closeStaffAccess();
+      showToast(j.removed ? 'Staff access switched off.' : 'Staff password saved. Share it with your helper — they can sell but not see money reports.');
+    } else {
+      err.textContent = j.error || 'Could not save staff password.';
+      err.style.display = 'block';
+    }
+  } catch (e) {
+    err.textContent = 'Network error: ' + (e.message || e);
+    err.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save staff password';
   }
 });
 
@@ -1692,7 +1744,7 @@ function renderInventory() {
   document.getElementById('invKpiGrid').innerHTML = [
     { label: 'Total items', val: totalItems, sub: 'SKUs listed', cls: '' },
     { label: 'Units in stock', val: totalUnits.toLocaleString(), sub: 'across all sizes', cls: 'success' },
-    { label: 'Inventory value', val: fmtKsh(totalValue), sub: 'at listed prices', cls: '' },
+    { label: 'Inventory value', val: fmtKsh(totalValue), sub: 'at listed prices', cls: 'inv-kpi-money' },
     { label: 'Low stock', val: lowStock, sub: '≤ 5 units remaining', cls: lowStock > 0 ? 'warn' : '' },
     { label: 'Out of stock', val: outOfStock, sub: 'need restocking', cls: outOfStock > 0 ? 'danger' : '' },
   ].map(k => `
@@ -1755,11 +1807,11 @@ function renderInventory() {
     if (bag.cost) {
       if (soldUnits > 0) {
         const profit = totalRevenue(bag) - bag.cost * soldUnits;
-        costLine = `<div style="font-size:11px;color:#2e7d32;">cost ${fmtKsh(bag.cost)} · profit ${fmtKsh(profit)}</div>`;
+        costLine = `<div class="inv-kpi-money" style="font-size:11px;color:#2e7d32;">cost ${fmtKsh(bag.cost)} · profit ${fmtKsh(profit)}</div>`;
       } else {
         const effectivePrice = (bag.salePrice > 0 && bag.salePrice < bag.price) ? bag.salePrice : bag.price;
         const margin = effectivePrice - bag.cost;
-        costLine = `<div style="font-size:11px;color:#2e7d32;">cost ${fmtKsh(bag.cost)} · margin ${fmtKsh(margin)}</div>`;
+        costLine = `<div class="inv-kpi-money" style="font-size:11px;color:#2e7d32;">cost ${fmtKsh(bag.cost)} · margin ${fmtKsh(margin)}</div>`;
       }
     }
 
@@ -1768,7 +1820,7 @@ function renderInventory() {
       <td><img class="item-img" src="${bag.image}" alt="${escapeHtml(bag.name)}"></td>
       <td>
         <div style="font-weight:600;font-size:13px;">${escapeHtml(bag.name)}</div>
-        <div style="font-size:11px;color:#999;margin-top:2px;">${soldUnits} sold · ${fmtKsh(totalRevenue(bag))} revenue</div>
+        <div style="font-size:11px;color:#999;margin-top:2px;">${soldUnits} sold<span class="client-money"> · ${fmtKsh(totalRevenue(bag))} revenue</span></div>
       </td>
       <td style="font-size:13px;">${escapeHtml(bag.category || '—')}</td>
       <td style="font-size:13px;font-weight:600;">${fmtKsh(bag.price)}${costLine}</td>
@@ -2321,7 +2373,7 @@ function renderLoyalty() {
     return `<div class="loyalty-row ${ready ? 'ready' : ''}">
       <div class="loyalty-row-main">
         <div class="loyalty-row-name">${escapeHtml(c.name || 'Unnamed buyer')}${badge}</div>
-        <div class="loyalty-row-sub">${escapeHtml(c.phone)} · ${c.purchases.length} purchase${c.purchases.length === 1 ? '' : 's'} · ${fmtKsh(c.spend)} spent · last ${relTime(new Date(c.lastAt).toISOString())}</div>
+        <div class="loyalty-row-sub">${escapeHtml(c.phone)} · ${c.purchases.length} purchase${c.purchases.length === 1 ? '' : 's'}<span class="client-money"> · ${fmtKsh(c.spend)} spent</span> · last ${relTime(new Date(c.lastAt).toISOString())}</div>
         <div class="loyalty-row-progress"><div class="loyalty-prog-meta">${progLine}</div><div class="loyalty-bar-track"><div class="loyalty-bar-fill" style="width:${pct}%"></div></div></div>
       </div>
       <div class="loyalty-row-actions">
@@ -2402,8 +2454,8 @@ function renderClients() {
   const kpi = document.getElementById('clientsKpiGrid');
   if (kpi) kpi.innerHTML = `
     <div class="inv-kpi"><div class="inv-kpi-label">Clients</div><div class="inv-kpi-val">${ledger.length}</div><div class="inv-kpi-sub">${repeat} repeat buyer${repeat === 1 ? '' : 's'}</div></div>
-    <div class="inv-kpi success"><div class="inv-kpi-label">Total spent</div><div class="inv-kpi-val">${fmtKsh(totalSpend)}</div><div class="inv-kpi-sub">across all clients</div></div>
-    <div class="inv-kpi"><div class="inv-kpi-label">Avg per client</div><div class="inv-kpi-val">${fmtKsh(avg)}</div><div class="inv-kpi-sub">lifetime value</div></div>
+    <div class="inv-kpi success inv-kpi-money"><div class="inv-kpi-label">Total spent</div><div class="inv-kpi-val">${fmtKsh(totalSpend)}</div><div class="inv-kpi-sub">across all clients</div></div>
+    <div class="inv-kpi inv-kpi-money"><div class="inv-kpi-label">Avg per client</div><div class="inv-kpi-val">${fmtKsh(avg)}</div><div class="inv-kpi-sub">lifetime value</div></div>
     <div class="inv-kpi"><div class="inv-kpi-label">Repeat rate</div><div class="inv-kpi-val">${ledger.length ? Math.round(repeat / ledger.length * 100) : 0}%</div><div class="inv-kpi-sub">bought 2+ times</div></div>
   `;
 
@@ -2423,7 +2475,7 @@ function renderClients() {
   listEl.innerHTML = rows.map(c => {
     const items = c.purchases.slice()
       .sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0))
-      .map(p => `<span class="client-item">${escapeHtml(p.bagName)}${p.size ? ' · ' + escapeHtml(p.size) : ''} × ${p.qty} · ${fmtKsh(p.amount)}</span>`).join('');
+      .map(p => `<span class="client-item">${escapeHtml(p.bagName)}${p.size ? ' · ' + escapeHtml(p.size) : ''} × ${p.qty}<span class="client-money"> · ${fmtKsh(p.amount)}</span></span>`).join('');
     const has = c.purchases.length;
     const when = has ? `last ${relTime(new Date(c.lastAt).toISOString())}`
                      : (c.addedAt ? `added ${relTime(c.addedAt)}` : 'no purchases yet');
@@ -2436,7 +2488,7 @@ function renderClients() {
       <div class="client-row">
         <div class="client-row-main">
           <div class="client-row-name">${escapeHtml(c.name || 'Unnamed buyer')}${manualTag}</div>
-          <div class="client-row-sub">${escapeHtml(c.phone)} · ${has} purchase${has === 1 ? '' : 's'} · ${fmtKsh(c.spend)} spent · ${when}${owedMap[c.phone] > 0 ? ` · <span class="owed-amount">owes ${fmtKsh(owedMap[c.phone])}</span>` : ''}</div>
+          <div class="client-row-sub">${escapeHtml(c.phone)} · ${has} purchase${has === 1 ? '' : 's'}<span class="client-money"> · ${fmtKsh(c.spend)} spent</span> · ${when}${owedMap[c.phone] > 0 ? ` · <span class="owed-amount">owes ${fmtKsh(owedMap[c.phone])}</span>` : ''}</div>
           ${noteLine}
           <div class="client-items">${items}</div>
         </div>
