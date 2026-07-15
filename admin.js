@@ -10,6 +10,11 @@ const BOOST_ENABLED = true;
 // Text + print receipts stay on Shop Records (3k); this only hides the polished
 // PNG receipt button. Set false on Shopfront / Shop Records builds. Default true.
 const RECEIPT_IMAGE_ENABLED = true;
+// Tier gate: the Staff (assistant) login is a paid 5k add-on. When false, the
+// owner can't set a staff password (the "Staff access" button is hidden) and no
+// assistant session is honoured, so the feature is fully paused. Flip to true
+// (and redeploy) once the owner pays for it. Ryker: OFF pending payment 2026-07-15.
+const STAFF_ENABLED = false;
 
 let bags = [];
 let settings = {};
@@ -31,8 +36,11 @@ function checkAuth() {
   if (sessionStorage.getItem('ryker_auth') === '1') {
     // Role gate: an 'assistant' can sell + manage stock but the admin hides all
     // money/report views (sales totals, profit, inventory value, owed, etc.).
-    const role = sessionStorage.getItem('ryker_role') || 'owner';
+    // Paid add-on: when STAFF_ENABLED is off, force the owner role (no assistant
+    // session is honoured) and hide the owner's "Staff access" button below.
+    const role = (STAFF_ENABLED && sessionStorage.getItem('ryker_role') === 'assistant') ? 'assistant' : 'owner';
     document.body.classList.toggle('role-assistant', role === 'assistant');
+    if (!STAFF_ENABLED) { const sb = document.getElementById('staffAccessBtn'); if (sb) sb.style.display = 'none'; }
     loginScreen.style.display = 'none';
     dashboard.style.display = 'block';
     init();
