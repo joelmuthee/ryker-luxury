@@ -1173,8 +1173,13 @@ async function recordSale(withBuyer) {
     if (typeof renderOwed === 'function') renderOwed();
     showToast(`Sale recorded — ${qty}× ${size} sold.`);
     if (withBuyer && (sale.buyerName || sale.buyerPhone)) sendBuyerToGHL(soldBag, sale);
-    // Offer a receipt (same panel the Sell-in-store flow uses).
-    lastPosSale = { name: soldBag ? soldBag.name : '', size, qty, amount: salePrice, paid: amountPaid, balance, discount, listPrice, paymentMethod: sale.paymentMethod, buyerName: sale.buyerName, buyerPhone: sale.buyerPhone, soldAt: sale.soldAt };
+    // Offer a receipt (same panel the Sell-in-store flow uses). lastPosSale always
+    // carries a lines[] array so every receipt renderer can iterate it.
+    lastPosSale = {
+      lines: [{ name: soldBag ? soldBag.name : '', size, color: color || '', qty, amount: salePrice, listPrice, discount }],
+      total: salePrice * qty, paid: amountPaid, balance,
+      paymentMethod: sale.paymentMethod, buyerName: sale.buyerName, buyerPhone: sale.buyerPhone, soldAt: sale.soldAt,
+    };
     showPosReceipt(lastPosSale);
     document.getElementById('posDash').scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (err) { showToast('Error: ' + err.message); }
@@ -2922,15 +2927,16 @@ function syncPaid(priceId, qtyId, paidId, hintId, btnId) {
 }
 ['salePaidInput', 'salePriceInput', 'saleQtyInput'].forEach(id => document.getElementById(id)?.addEventListener('input',
   () => syncPaid('salePriceInput', 'saleQtyInput', 'salePaidInput', 'salePaidHint', 'salePaidNone')));
+// POS paid hint is cart-aware (whole basket, not just the current line editor).
 ['posPaid', 'posPrice', 'posQty'].forEach(id => document.getElementById(id)?.addEventListener('input',
-  () => syncPaid('posPrice', 'posQty', 'posPaid', 'posPaidHint', 'posPaidNone')));
+  () => posSyncPaid()));
 document.getElementById('salePaidNone')?.addEventListener('click', () => {
   document.getElementById('salePaidInput').value = '0';
   syncPaid('salePriceInput', 'saleQtyInput', 'salePaidInput', 'salePaidHint', 'salePaidNone');
 });
 document.getElementById('posPaidNone')?.addEventListener('click', () => {
   document.getElementById('posPaid').value = '0';
-  syncPaid('posPrice', 'posQty', 'posPaid', 'posPaidHint', 'posPaidNone');
+  posSyncPaid();
 });
 
 // Discount: subtract from the list price (held in dataset.list) and write the net
@@ -2955,7 +2961,7 @@ function rebaseList(priceId, discId) {
 document.getElementById('saleDiscountInput')?.addEventListener('input',
   () => applyDiscount('salePriceInput', 'saleDiscountInput', 'saleQtyInput', 'salePaidInput', 'salePaidHint', 'salePaidNone'));
 document.getElementById('posDiscount')?.addEventListener('input',
-  () => applyDiscount('posPrice', 'posDiscount', 'posQty', 'posPaid', 'posPaidHint', 'posPaidNone'));
+  () => { applyDiscount('posPrice', 'posDiscount', 'posQty', 'posPaid', 'posPaidHint', 'posPaidNone'); posSyncPaid(); });
 document.getElementById('salePriceInput')?.addEventListener('input', () => rebaseList('salePriceInput', 'saleDiscountInput'));
 document.getElementById('posPrice')?.addEventListener('input', () => rebaseList('posPrice', 'posDiscount'));
 
@@ -3592,6 +3598,10 @@ function initNavScrollSpy() {
 let posItemId = '';
 let posPayMethod = 'mpesa';
 let lastPosSale = null;
+// Cart for Sell in store: several lines (same item different sizes, or different
+// items) checked out as ONE sale — one payment, one customer, one receipt.
+// Each line: { itemId, name, color, size, qty, price, listPrice, discount }.
+let posCart = [];
 
 function posWaPhone(p) {
   let d = String(p || '').replace(/[^0-9]/g, '');
@@ -3643,19 +3653,23 @@ function posSelectItem(id) {
   posPriceEl.value = (bag.salePrice > 0 && bag.salePrice < bag.price) ? bag.salePrice : (bag.price || '');
   posPriceEl.dataset.list = posPriceEl.value;
   document.getElementById('posDiscount').value = '';
+  document.getElementById('posPaid').value = '';
   document.getElementById('posDate').value = todayInputValue();
   document.getElementById('posChosen').innerHTML = `Selling <strong>${escapeHtml(bag.name)}</strong> · <button type="button" id="posClearItem">change</button>`;
   document.getElementById('posChosen').style.display = '';
   document.getElementById('posSaleFields').style.display = '';
+  document.getElementById('posSaleSection').style.display = '';
   document.getElementById('posReceiptPanel').style.display = 'none';
 }
 
 function posReset() {
-  posItemId = ''; posPayMethod = 'mpesa';
-  ['posItemSearch', 'posBuyerName', 'posBuyerPhone', 'posPaid', 'posNotes'].forEach(i => { const el = document.getElementById(i); if (el) el.value = ''; });
+  posItemId = ''; posPayMethod = 'mpesa'; posCart = [];
+  renderPosCart();
+  ['posItemSearch', 'posBuyerName', 'posBuyerPhone', 'posPaid', 'posNotes', 'posDiscount'].forEach(i => { const el = document.getElementById(i); if (el) el.value = ''; });
   document.getElementById('posItemResults').style.display = 'none';
   document.getElementById('posChosen').style.display = 'none';
   document.getElementById('posSaleFields').style.display = 'none';
+  document.getElementById('posSaleSection').style.display = 'none';
   document.getElementById('posReceiptPanel').style.display = 'none';
   document.getElementById('posCustomerFields').style.display = '';
   document.getElementById('posPaidHint').style.display = 'none';
@@ -3664,14 +3678,100 @@ function posReset() {
   document.querySelectorAll('#posPay .pos-pay-btn').forEach(b => b.classList.toggle('active', b.dataset.pay === 'mpesa'));
 }
 
+// Read the LINE editor into a cart line (or null if nothing valid is entered).
+// Used by both "Add another item" and Record sale (so a single item still records
+// without tapping Add).
+function posCurrentLine() {
+  if (!posItemId) return null;
+  const bag = bags.find(b => b.id === posItemId);
+  if (!bag) return null;
+  const size = document.getElementById('posSize').value;
+  if (!size) return null;
+  const qty = parseInt(document.getElementById('posQty').value, 10) || 0;
+  if (qty < 1) return null;
+  const priceRaw = parseInt(document.getElementById('posPrice').value, 10);
+  if (isNaN(priceRaw) || priceRaw < 0) return null;
+  const color = itemColors(bag).length ? (document.getElementById('posColor').value || '') : '';
+  const discount = Math.max(0, parseInt(document.getElementById('posDiscount').value, 10) || 0);
+  const listPrice = parseInt(document.getElementById('posPrice').dataset.list, 10) || (priceRaw + discount);
+  return { itemId: posItemId, name: bag.name, color, size, qty, price: priceRaw, listPrice, discount };
+}
+
+function renderPosCart() {
+  const box = document.getElementById('posCartList');
+  if (!box) return;
+  if (!posCart.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  let sub = 0;
+  const rows = posCart.map((l, i) => {
+    const lineTotal = l.price * l.qty;
+    sub += lineTotal;
+    const col = l.color ? `${escapeHtml(l.color)} · ` : '';
+    return `<div class="pos-cart-row"><span class="pos-cart-name">${escapeHtml(l.name)} · ${col}${escapeHtml(l.size)} · ×${l.qty}</span><span class="pos-cart-amt">${fmtKsh(lineTotal)}</span><button type="button" class="pos-cart-x" data-cart-idx="${i}" aria-label="Remove">×</button></div>`;
+  }).join('');
+  box.innerHTML = rows + `<div class="pos-cart-sub"><span>Subtotal</span><span>${fmtKsh(sub)}</span></div>`;
+  box.style.display = '';
+}
+
+function posAddLine() {
+  if (!posItemId) { showToast('Pick an item first.'); return; }
+  const bag = bags.find(b => b.id === posItemId);
+  if (!bag) { showToast('Item not found — refresh.'); return; }
+  const size = document.getElementById('posSize').value;
+  if (!size) { showToast('Choose a size.'); return; }
+  const qty = parseInt(document.getElementById('posQty').value, 10) || 0;
+  if (qty < 1) { showToast('Quantity must be at least 1.'); return; }
+  const priceRaw = parseInt(document.getElementById('posPrice').value, 10);
+  if (isNaN(priceRaw) || priceRaw < 0) { showToast('Enter a selling price.'); return; }
+  const color = itemColors(bag).length ? (document.getElementById('posColor').value || '') : '';
+  const discount = Math.max(0, parseInt(document.getElementById('posDiscount').value, 10) || 0);
+  const listPrice = parseInt(document.getElementById('posPrice').dataset.list, 10) || (priceRaw + discount);
+  posCart.push({ itemId: posItemId, name: bag.name, color, size, qty, price: priceRaw, listPrice, discount });
+  renderPosCart();
+  // Reset ONLY the line editor for the next item — keep the sale section (paid /
+  // date / payment / customer / note) and the cart list untouched.
+  posItemId = '';
+  document.getElementById('posItemSearch').value = '';
+  document.getElementById('posItemResults').style.display = 'none';
+  document.getElementById('posChosen').style.display = 'none';
+  document.getElementById('posSaleFields').style.display = 'none';
+  document.getElementById('posDiscount').value = '';
+  document.getElementById('posSaleSection').style.display = '';
+  posSyncPaid();
+  showToast('Added to the sale.');
+}
+
+// POS paid-balance hint, cart-aware: total = cart lines + the pending line editor.
+function posSyncPaid() {
+  const paidEl = document.getElementById('posPaid');
+  const hintEl = document.getElementById('posPaidHint');
+  if (!paidEl || !hintEl) return;
+  const pending = posCurrentLine();
+  const total = posCart.reduce((s, l) => s + l.price * l.qty, 0) + (pending ? pending.price * pending.qty : 0);
+  const raw = (paidEl.value || '').trim();
+  if (raw === '') { hintEl.style.display = 'none'; }
+  else {
+    const bal = total - Math.min(total, Math.max(0, parseInt(raw, 10) || 0));
+    hintEl.style.display = bal > 0 ? '' : 'none';
+    if (bal > 0) hintEl.textContent = `Balance owing: ${fmtKsh(bal)}`;
+  }
+  const btn = document.getElementById('posPaidNone');
+  if (btn) btn.classList.toggle('active', raw === '0');
+}
+
+// Total discount across all lines (listPrice−net)×qty, for the "you saved" note.
+function posReceiptDiscount(s) {
+  return (s.lines || []).reduce((a, l) => a + (l.discount > 0 ? ((l.listPrice || l.amount) - l.amount) * l.qty : 0), 0);
+}
+
 function posReceiptText(s) {
-  const total = s.amount * s.qty;
-  const lines = [
-    `*Ryker Luxury* receipt`,
-    `${s.name} (Size ${s.size}) x${s.qty}`,
-    `Total: ${fmtKsh(total)}. Paid by ${s.paymentMethod === 'mpesa' ? 'M-Pesa' : 'Cash'}.`,
-  ];
-  if (s.discount > 0) lines.push(`Discount: ${fmtKsh(s.discount)} off (was ${fmtKsh((s.listPrice || s.amount) * s.qty)}).`);
+  const lines = [`*Ryker Luxury* receipt`];
+  (s.lines || []).forEach(l => {
+    const col = l.color ? ` · ${l.color}` : '';
+    lines.push(`${l.name} (Size ${l.size})${col} ×${l.qty} — ${fmtKsh(l.amount * l.qty)}`);
+  });
+  lines.push(`Total: ${fmtKsh(s.total)}. Paid by ${s.paymentMethod === 'mpesa' ? 'M-Pesa' : 'Cash'}.`);
+  const disc = posReceiptDiscount(s);
+  if (disc > 0) lines.push(`Discount: ${fmtKsh(disc)} off (was ${fmtKsh(s.total + disc)}).`);
   if (s.balance > 0) lines.push(`Paid now: ${fmtKsh(s.paid)}. Balance owing: ${fmtKsh(s.balance)}.`);
   lines.push(`Thank you for shopping with us. Legend Valley Business Park, Gitanga Road, Nairobi.`);
   return lines.join('\n');
@@ -3679,14 +3779,19 @@ function posReceiptText(s) {
 
 function showPosReceipt(s) {
   document.getElementById('posSaleFields').style.display = 'none';
+  document.getElementById('posSaleSection').style.display = 'none';
   document.getElementById('posChosen').style.display = 'none';
   document.getElementById('posItemSearch').value = '';
-  const total = s.amount * s.qty;
   const pay = s.paymentMethod === 'mpesa' ? 'M-Pesa' : 'Cash';
-  const discLine = s.discount > 0 ? `<br><span style="color:#1a7a3a;">Discount ${fmtKsh(s.discount)} off (was ${fmtKsh((s.listPrice || s.amount) * s.qty)})</span>` : '';
+  const itemsHtml = (s.lines || []).map(l => {
+    const col = l.color ? ` · ${escapeHtml(l.color)}` : '';
+    return `<strong>${escapeHtml(l.name)}</strong> · Size ${escapeHtml(l.size)}${col} · ×${l.qty} · ${fmtKsh(l.amount * l.qty)}`;
+  }).join('<br>');
+  const disc = posReceiptDiscount(s);
+  const discLine = disc > 0 ? `<br><span style="color:#1a7a3a;">Discount ${fmtKsh(disc)} off (was ${fmtKsh(s.total + disc)})</span>` : '';
   const balLine = s.balance > 0 ? `<br><span class="owed-amount">Paid ${fmtKsh(s.paid)} · still owes ${fmtKsh(s.balance)}</span>` : '';
   document.getElementById('posReceiptSummary').innerHTML =
-    `<strong>${escapeHtml(s.name)}</strong> · Size ${escapeHtml(s.size)} · ${s.qty} item(s)<br>${fmtKsh(total)} · paid by ${pay}${discLine}${balLine}`;
+    `${itemsHtml}<br><strong>Total ${fmtKsh(s.total)}</strong> · paid by ${pay}${discLine}${balLine}`;
   const wa = document.getElementById('posWaReceiptBtn');
   if (s.buyerPhone && s.buyerPhone.replace(/[^0-9]/g, '').length >= 9) {
     wa.href = `https://wa.me/${posWaPhone(s.buyerPhone)}?text=${encodeURIComponent(posReceiptText(s))}`;
@@ -3707,9 +3812,10 @@ window.reissueReceipt = (bagId, soldAt) => {
   const qty = Number(s.qty) || 1;
   const amount = Number(s.salePrice || bag.price) || 0;
   const balance = (typeof saleBalance === 'function') ? saleBalance(bag, s) : 0;
+  const total = amount * qty;
   lastPosSale = {
-    name: bag.name, size: s.size || '', qty, amount,
-    paid: (amount * qty) - balance, balance,
+    lines: [{ name: bag.name, size: s.size || '', color: s.color || '', qty, amount, listPrice: s.listPrice || amount, discount: s.discount || 0 }],
+    total, paid: total - balance, balance,
     paymentMethod: s.paymentMethod, buyerName: s.buyerName, buyerPhone: s.buyerPhone, soldAt: s.soldAt,
   };
   showPosReceipt(lastPosSale);
@@ -3719,14 +3825,18 @@ window.reissueReceipt = (bagId, soldAt) => {
 
 function posPrintReceipt() {
   if (!lastPosSale) return;
-  const s = lastPosSale, total = s.amount * s.qty, d = new Date(s.soldAt);
+  const s = lastPosSale, total = s.total, d = new Date(s.soldAt);
+  const itemRows = (s.lines || []).map(l => {
+    const col = l.color ? ` · ${escapeHtml(l.color)}` : '';
+    return `<div class="rcpt-row"><span>${escapeHtml(l.name)}</span></div>
+      <div class="rcpt-row"><span>Size ${escapeHtml(l.size)}${col} · ${l.qty} × ${fmtKsh(l.amount)}</span><span>${fmtKsh(l.amount * l.qty)}</span></div>`;
+  }).join('');
   document.getElementById('posReceiptPrint').innerHTML = `
     <div class="rcpt">
       <div class="rcpt-head">Ryker Luxury</div>
       <div class="rcpt-sub">Legend Valley Business Park, Gitanga Road, Nairobi<br>0714 672 436</div>
       <hr>
-      <div class="rcpt-row"><span>${escapeHtml(s.name)}</span></div>
-      <div class="rcpt-row"><span>Size ${escapeHtml(s.size)} · ${s.qty} × ${fmtKsh(s.amount)}</span><span>${fmtKsh(total)}</span></div>
+      ${itemRows}
       <hr>
       <div class="rcpt-row rcpt-total"><span>TOTAL</span><span>${fmtKsh(total)}</span></div>
       ${s.buyerName ? `<div class="rcpt-row"><span>Customer</span><span>${escapeHtml(s.buyerName)}</span></div>` : ''}
@@ -3739,22 +3849,18 @@ function posPrintReceipt() {
 }
 
 async function recordPosSale() {
-  const targetId = posItemId;
-  if (!targetId) { showToast('Pick an item first.'); return; }
-  if (!bags.find(b => b.id === targetId)) { showToast('Item not found — refresh.'); return; }
-  const size = document.getElementById('posSize').value;
-  const qty = parseInt(document.getElementById('posQty').value, 10) || 1;
-  const priceRaw = parseInt(document.getElementById('posPrice').value, 10);
+  // Whole-cart checkout. Any valid pending line still in the editor is added too,
+  // so "pick one item → Record sale" (no Add) still records that single item.
+  const lines = [...posCart];
+  const pending = posCurrentLine();
+  if (pending) lines.push(pending);
+  if (!lines.length) { showToast('Add an item to the sale first.'); return; }
+  for (const l of lines) if (!bags.find(b => b.id === l.itemId)) { showToast('An item was not found — refresh.'); return; }
+  const total = lines.reduce((s, l) => s + l.price * l.qty, 0);
   const name = document.getElementById('posBuyerName').value.trim();
   const phone = document.getElementById('posBuyerPhone').value.trim().replace(/[^0-9+]/g, '');
   const note = document.getElementById('posNotes').value.trim();
   const soldAt = soldAtFromDateInput(document.getElementById('posDate').value);
-  const amount = isNaN(priceRaw) ? (bags.find(b => b.id === targetId)?.price || 0) : priceRaw; // already discounted (net)
-  const posCurBag = bags.find(b => b.id === targetId);
-  const color = itemColors(posCurBag).length ? (document.getElementById('posColor').value || '') : '';
-  const discount = Math.max(0, parseInt(document.getElementById('posDiscount').value, 10) || 0);
-  const listPrice = parseInt(document.getElementById('posPrice').dataset.list, 10) || (amount + discount);
-  const total = amount * qty;
   const paidRaw = (document.getElementById('posPaid').value || '').trim();
   const amountPaid = paidRaw === '' ? total : Math.min(total, Math.max(0, parseInt(paidRaw, 10) || 0));
   const balance = total - amountPaid;
@@ -3763,19 +3869,29 @@ async function recordPosSale() {
   }
   const btn = document.getElementById('posRecordBtn'); btn.disabled = true;
   try {
-    let soldName = '';
+    const recLines = [];
     await apiMutateAndPublish(() => {
-      const bag = bags.find(b => b.id === targetId);
-      if (!bag) throw new Error('Item no longer exists — refresh admin');
-      if (color && itemHasColorStock(bag) && bag.stockByColor[color] && bag.stockByColor[color][size] !== undefined) {
-        bag.stockByColor[color][size] = Math.max(0, bag.stockByColor[color][size] - qty);
-        bag.stock = aggregateStock(bag.stockByColor);
-      } else if (bag.stock && bag.stock[size] !== undefined) {
-        bag.stock[size] = Math.max(0, bag.stock[size] - qty);
+      recLines.length = 0;
+      // Distribute the paid amount across lines by line total (like commitBulkSold).
+      // When paid in full every line is fully paid (remaining = Infinity).
+      let remaining = balance > 0 ? amountPaid : Infinity;
+      for (const l of lines) {
+        const bag = bags.find(b => b.id === l.itemId);
+        if (!bag) continue;
+        const lineTotal = l.price * l.qty;
+        const lineShare = balance > 0 ? Math.min(remaining, lineTotal) : lineTotal;
+        if (balance > 0) remaining = Math.max(0, remaining - lineShare);
+        if (l.color && itemHasColorStock(bag) && bag.stockByColor[l.color] && bag.stockByColor[l.color][l.size] !== undefined) {
+          bag.stockByColor[l.color][l.size] = Math.max(0, bag.stockByColor[l.color][l.size] - l.qty);
+          bag.stock = aggregateStock(bag.stockByColor);
+        } else if (bag.stock && bag.stock[l.size] !== undefined) {
+          bag.stock[l.size] = Math.max(0, bag.stock[l.size] - l.qty);
+        }
+        if (!bag.sales) bag.sales = [];
+        bag.sales.push({ size: l.size, ...(l.color ? { color: l.color } : {}), qty: l.qty, salePrice: l.price, ...(l.discount > 0 ? { discount: l.discount, listPrice: l.listPrice } : {}), amountPaid: lineShare, paymentMethod: posPayMethod, channel: 'shop', buyerName: name, buyerPhone: phone, notes: note, soldAt });
+        recLines.push({ name: bag.name, size: l.size, color: l.color, qty: l.qty, amount: l.price, listPrice: l.listPrice, discount: l.discount });
       }
-      if (!bag.sales) bag.sales = [];
-      bag.sales.push({ size, ...(color ? { color } : {}), qty, salePrice: amount, ...(discount > 0 ? { discount, listPrice } : {}), amountPaid, paymentMethod: posPayMethod, channel: 'shop', buyerName: name, buyerPhone: phone, notes: note, soldAt });
-      soldName = bag.name;
+      // Upsert the client ONCE for the whole sale (not per line).
       if (phone.replace(/[^0-9]/g, '').length >= 9) {
         if (!Array.isArray(clients)) clients = [];
         const norm = phone.replace(/[^0-9]/g, '');
@@ -3784,12 +3900,15 @@ async function recordPosSale() {
         else clients.push({ id: 'c_' + Date.now(), name: name || '', phone, note, createdAt: soldAt });
       }
     });
-    lastPosSale = { name: soldName, size, qty, amount, paid: amountPaid, balance, discount, listPrice, paymentMethod: posPayMethod, buyerName: name, buyerPhone: phone, soldAt };
+    lastPosSale = { lines: recLines, total, paid: amountPaid, balance, paymentMethod: posPayMethod, buyerName: name, buyerPhone: phone, soldAt };
+    posCart = [];
     renderList(); renderDashboard(); renderInventory();
     if (typeof renderClients === 'function') renderClients();
     if (typeof renderOwed === 'function') renderOwed();
+    posReset();
     showPosReceipt(lastPosSale);
-    showToast(balance > 0 ? `Sold · ${fmtKsh(amountPaid)} paid, ${fmtKsh(balance)} owed` : `Sold ${qty}× ${size} · ${fmtKsh(total)}`);
+    const n = recLines.length;
+    showToast(balance > 0 ? `Sold ${n} item(s) · ${fmtKsh(amountPaid)} paid, ${fmtKsh(balance)} owed` : `Sold ${n} item(s) · ${fmtKsh(total)}`);
   } catch (e) { showToast('Error: ' + e.message); }
   finally { btn.disabled = false; }
 }
@@ -3814,8 +3933,9 @@ function loadReceiptLogo() {
 function buildReceiptCanvas(s, logoImg) {
   const SCALE = 3, W = 620, M = 44;
   const hasBal = s.balance > 0;
+  const lineCount = (s.lines || []).length || 1;
   const seg = { top: 34, logo: logoImg ? 132 : 88, caption: 30, addr: 46, div1: 26,
-    item: 64, div2: 26, total: 52, cust: s.buyerName ? 34 : 0, paid: 34, bal: hasBal ? 70 : 0, date: 38, foot: 60, bottom: 30 };
+    items: lineCount * 48 + 16, div2: 26, total: 52, cust: s.buyerName ? 34 : 0, paid: 34, bal: hasBal ? 70 : 0, date: 38, foot: 60, bottom: 30 };
   const H = Object.values(seg).reduce((a, b) => a + b, 0);
   const c = document.createElement('canvas');
   c.width = W * SCALE; c.height = H * SCALE;
@@ -3847,13 +3967,18 @@ function buildReceiptCanvas(s, logoImg) {
   const div = () => { x.strokeStyle = '#ebe0c9'; x.lineWidth = 1; x.beginPath(); x.moveTo(M, y); x.lineTo(W - M, y); x.stroke(); };
   div(); y += seg.div1;
 
-  const total = s.amount * s.qty;
-  x.textAlign = 'left'; x.fillStyle = '#2a1c0f'; x.font = '600 18px Arial';
-  x.fillText(trunc(s.name, 32), M, y + 6);
-  x.fillStyle = '#8a7460'; x.font = '14px Arial';
-  x.fillText(`Size ${s.size} · ${s.qty} × ${fmtKsh(s.amount)}`, M, y + 30);
-  x.textAlign = 'right'; x.fillStyle = '#2a1c0f'; x.font = '600 18px Arial';
-  x.fillText(fmtKsh(total), W - M, y + 30); y += seg.item;
+  const total = s.total;
+  (s.lines || []).forEach(l => {
+    const col = l.color ? ` · ${l.color}` : '';
+    x.textAlign = 'left'; x.fillStyle = '#2a1c0f'; x.font = '600 17px Arial';
+    x.fillText(trunc(l.name, 30), M, y + 6);
+    x.fillStyle = '#8a7460'; x.font = '13px Arial';
+    x.fillText(trunc(`Size ${l.size}${col} · ${l.qty} × ${fmtKsh(l.amount)}`, 40), M, y + 26);
+    x.textAlign = 'right'; x.fillStyle = '#2a1c0f'; x.font = '600 17px Arial';
+    x.fillText(fmtKsh(l.amount * l.qty), W - M, y + 14);
+    y += 48;
+  });
+  y += 16;
 
   x.textAlign = 'left'; div(); y += seg.div2;
 
@@ -3898,7 +4023,7 @@ async function posShareReceiptImage() {
     const canvas = buildReceiptCanvas(lastPosSale, logo);
     const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
     if (!blob) throw new Error('render failed');
-    const fname = `ryker-receipt-${(lastPosSale.name || 'sale').replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 32)}.png`;
+    const fname = `ryker-receipt-${((lastPosSale.lines && lastPosSale.lines[0] && lastPosSale.lines[0].name) || 'sale').replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 32)}.png`;
     const file = new File([blob], fname, { type: 'image/png' });
     // Best path: native share sheet with the image file (lets the owner pick
     // WhatsApp and the customer chat, image attached). Falls back to a download
@@ -3924,7 +4049,16 @@ document.getElementById('posItemSearch')?.addEventListener('input', e => {
   posItemId = '';
   document.getElementById('posSaleFields').style.display = 'none';
   document.getElementById('posChosen').style.display = 'none';
+  // Keep the sale section (payment + customer) visible while the cart has items.
+  document.getElementById('posSaleSection').style.display = posCart.length ? '' : 'none';
   posRenderResults(e.target.value.trim());
+});
+document.getElementById('posAddLineBtn')?.addEventListener('click', posAddLine);
+document.getElementById('posCartList')?.addEventListener('click', e => {
+  const x = e.target.closest('.pos-cart-x');
+  if (!x) return;
+  const idx = parseInt(x.dataset.cartIdx, 10);
+  if (!isNaN(idx)) { posCart.splice(idx, 1); renderPosCart(); posSyncPaid(); }
 });
 document.getElementById('posItemResults')?.addEventListener('click', e => {
   const opt = e.target.closest('.client-item-opt');
