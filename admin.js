@@ -2165,6 +2165,18 @@ async function commitBulkSold(withBuyer) {
     const owed = hasPartial ? Math.max(0, total - Math.max(0, parseInt(paidRaw, 10) || 0)) : 0;
     showToast(`Sold ${soldList.length} item${soldList.length === 1 ? '' : 's'}${withBuyer && buyer.name ? ' to ' + buyer.name : ''} · ${fmtKsh(total)}${owed > 0 ? ` · ${fmtKsh(owed)} owed` : ''}`);
     if (withBuyer && buyer.phone && soldList[0]) sendBuyerToGHL(soldList[0].bag, soldList[0].sale);
+    // Full multi-item receipt right away (parity with the POS cart) — lists EVERY
+    // product bought, so a bulk "sell to one customer" produces one complete receipt.
+    if (soldList.length) {
+      const paidTotal = hasPartial ? Math.min(total, Math.max(0, parseInt(paidRaw, 10) || 0)) : total;
+      lastPosSale = {
+        lines: soldList.map(({ bag, sale }) => ({ name: bag.name, size: sale.size || '', color: sale.color || '', qty: Number(sale.qty) || 1, amount: Number(sale.salePrice) || 0, listPrice: sale.listPrice || sale.salePrice, discount: sale.discount || 0 })),
+        total, paid: paidTotal, balance: Math.max(0, total - paidTotal),
+        paymentMethod: payMethod, buyerName: withBuyer ? buyer.name : '', buyerPhone: withBuyer ? buyer.phone : '', soldAt,
+      };
+      showPosReceipt(lastPosSale);
+      document.getElementById('posDash').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   } catch (err) { showToast('Error: ' + err.message); }
 }
 // Existing-customer picker (shared by future single-modal use too).
@@ -3806,21 +3818,31 @@ function showPosReceipt(s) {
 // sales). Rebuilds the receipt object from the stored sale, then shows the same
 // send panel (WhatsApp text receipt + branded image receipt) used right after a sale.
 window.reissueReceipt = (bagId, soldAt) => {
-  const bag = bags.find(b => b.id === bagId);
-  const s = bag && (bag.sales || []).find(x => x.soldAt === soldAt);
-  if (!bag || !s) { showToast('Could not find that sale.'); return; }
-  const qty = Number(s.qty) || 1;
-  const amount = Number(s.salePrice || bag.price) || 0;
-  const balance = (typeof saleBalance === 'function') ? saleBalance(bag, s) : 0;
-  const total = amount * qty;
+  // A multi-item sale (POS cart OR bulk "sell to one customer") records ONE sale
+  // row per item, all sharing the same soldAt + buyer. Rebuild the WHOLE receipt,
+  // not just the clicked line, so the image/WhatsApp receipt lists every product.
+  const anchorBag = bags.find(b => b.id === bagId);
+  const anchor = anchorBag && (anchorBag.sales || []).find(x => x.soldAt === soldAt);
+  if (!anchorBag || !anchor) { showToast('Could not find that sale.'); return; }
+  const sameBuyer = s => (s.buyerName || '') === (anchor.buyerName || '') && (s.buyerPhone || '') === (anchor.buyerPhone || '');
+  const group = [];
+  bags.forEach(b => (b.sales || []).forEach(s => { if (s.soldAt === soldAt && sameBuyer(s)) group.push({ bag: b, sale: s }); }));
+  const src = group.length ? group : [{ bag: anchorBag, sale: anchor }];
+  let total = 0, paid = 0;
+  const lines = src.map(({ bag, sale }) => {
+    const qty = Number(sale.qty) || 1;
+    const amount = Number(sale.salePrice != null ? sale.salePrice : bag.price) || 0;
+    total += amount * qty;
+    paid += Number(sale.amountPaid != null ? sale.amountPaid : amount * qty) || 0;
+    return { name: bag.name, size: sale.size || '', color: sale.color || '', qty, amount, listPrice: sale.listPrice || amount, discount: sale.discount || 0 };
+  });
   lastPosSale = {
-    lines: [{ name: bag.name, size: s.size || '', color: s.color || '', qty, amount, listPrice: s.listPrice || amount, discount: s.discount || 0 }],
-    total, paid: total - balance, balance,
-    paymentMethod: s.paymentMethod, buyerName: s.buyerName, buyerPhone: s.buyerPhone, soldAt: s.soldAt,
+    lines, total, paid, balance: Math.max(0, total - paid),
+    paymentMethod: anchor.paymentMethod, buyerName: anchor.buyerName, buyerPhone: anchor.buyerPhone, soldAt,
   };
   showPosReceipt(lastPosSale);
   document.getElementById('posDash').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  showToast('Receipt ready — send it on WhatsApp or as an image below.');
+  showToast(lines.length > 1 ? `Receipt for ${lines.length} items ready — send it below.` : 'Receipt ready — send it on WhatsApp or as an image below.');
 };
 
 function posPrintReceipt() {
