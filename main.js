@@ -14,6 +14,7 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
   let items = [];
   let settings = {};
   let suspended = false;
+  let suspendMode = 'full'; // 'full' (prospect pitch) | 'client' (neutral copy) | 'admin' (no overlay)
   let currentAvail = 'all';
   let currentCat = 'all';
   let currentSize = 'all';
@@ -121,11 +122,12 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
       const json = await res.json();
       items = json.bags || [];
       settings = json.settings || {};
-      // Only the FULL pause takes the public storefront offline. An "admin" pause
-      // locks the owner's admin but keeps the shop live for buyers (real clients
-      // we don't want to embarrass). Old worker with no suspendMode → treat a
-      // suspended flag as full (unchanged behaviour).
-      suspended = !!json.suspended && (json.suspendMode ? json.suspendMode === 'full' : true);
+      // An "admin" pause locks the owner's admin but keeps the shop live for
+      // buyers (real clients we don't want to embarrass). "full" and "client"
+      // both go offline; they differ only in the overlay copy. Old worker with
+      // no suspendMode → treat a suspended flag as full (unchanged behaviour).
+      suspendMode = json.suspendMode || 'full';
+      suspended = !!json.suspended && suspendMode !== 'admin';
     } catch (e) {
       try {
         const res = await fetch('data.json');
@@ -950,7 +952,11 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
   function showSuspended() {
     document.documentElement.style.overflow = 'hidden';
     const shopName = settings.shopName || 'Ryker Luxury';
-    document.title = shopName + ' · Paused';
+    // Client pause: neutral wording only. Their buyers must never read anything
+    // about our billing, and we never pitch buying the shop over a paying
+    // client's storefront. The one-off pitch is for prospect/demo shops.
+    const isClient = suspendMode === 'client';
+    document.title = shopName + (isClient ? ' · Offline' : ' · Paused');
 
     const tagline = settings.tagline || 'Premium Menswear · Nairobi';
     const igHandle = (settings.instagramHandle || 'rykerluxury').replace(/^@/, '');
@@ -979,6 +985,23 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
     styleTag.textContent = css;
     document.head.appendChild(styleTag);
 
+    // Client copy: neutral, no pitch, and route buyers to the shop's OWN
+    // Instagram so the client keeps her customers while the site is down.
+    const clientBody = (
+      '<h1 class="rk-head">This website is temporarily offline</h1>'
+      + '<p class="rk-body">We are back shortly. '
+      + (igLink ? 'In the meantime you can see our latest stock and order on Instagram.' : 'Please check back soon.')
+      + '</p>'
+      + (igLink ? '<a class="rk-ig" href="' + igLink + '" target="_blank" rel="noopener">' + IG_SVG + ' See us on Instagram</a>' : '')
+    );
+    // Prospect copy: pitch the one-off win-back to the shop owner.
+    const prospectBody = (
+      '<h1 class="rk-head">This shop is paused</h1>'
+      + '<p class="rk-body">Not ready for a monthly plan? You don\'t need one.</p>'
+      + '<p class="rk-offer">Now you can <b>own this shop outright for a one-time Ksh 20,000</b>, no monthly fees. New stock you post on Instagram pulls straight into your shop. Buyers can filter by category and size to find what they want fast, then order on WhatsApp.</p>'
+      + '<a class="rk-ig" href="' + waLink + '" target="_blank" rel="noopener">' + WA_SVG + ' Bring my shop back</a>'
+    );
+
     const o = document.createElement('div');
     o.id = 'suspendedOverlay';
     o.innerHTML = (
@@ -986,10 +1009,7 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
       + '<div class="rk-name">' + shopName + '</div>'
       + (tagline ? '<div class="rk-tag">' + tagline + '</div>' : '<div style="height:30px"></div>')
       + '<div class="rk-rule"></div>'
-      + '<h1 class="rk-head">This shop is paused</h1>'
-      + '<p class="rk-body">Not ready for a monthly plan? You don\'t need one.</p>'
-      + '<p class="rk-offer">Now you can <b>own this shop outright for a one-time Ksh 20,000</b>, no monthly fees. New stock you post on Instagram pulls straight into your shop. Buyers can filter by category and size to find what they want fast, then order on WhatsApp.</p>'
-      + '<a class="rk-ig" href="' + waLink + '" target="_blank" rel="noopener">' + WA_SVG + ' Bring my shop back</a>'
+      + (isClient ? clientBody : prospectBody)
     );
     document.body.appendChild(o);
   }

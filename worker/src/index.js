@@ -34,15 +34,20 @@ const isMaster = (req, env) => {
 // store can be maintained while suspended. Returns a 403 Response when the caller
 // is blocked, or null when the write may proceed. Authoritative gate: the admin
 // UI also blocks these, but this is the real lock the owner can't bypass.
-// suspended KV: "0"/absent = active; "1" = FULL pause (public offline overlay +
-// admin write-locked, for prospect/demo sites); "admin" = ADMIN-ONLY pause (admin
-// write-locked but the public storefront stays fully live, for real clients we
-// don't want to embarrass in front of their buyers). Writes are frozen in BOTH
-// paused states — the difference is only whether the public site goes dark.
+// suspended KV — "0"/absent = active. Three pause states, all of which freeze
+// admin WRITES (that's the leverage); they differ only in what BUYERS see:
+//   "1"      FULL pause, prospect copy — offline overlay that pitches the one-off.
+//            Legacy default, for demo/prospect shops with no real customers.
+//   "client" FULL pause, client copy — offline overlay with NEUTRAL wording
+//            ("temporarily offline"), no sales pitch. For a paying client we are
+//            leaning on hard: their buyers must never read about our billing.
+//   "admin"  ADMIN-ONLY pause — storefront stays fully live, buyers see nothing.
+//            The soft option for a client, and the usual one.
+const SUSPEND_STATES = ["1", "client", "admin"];
 const suspendBlock = async (req, env) => {
   if (isMaster(req, env)) return null;
   const s = await env.BAGS.get("suspended");
-  if (s === "1" || s === "admin") {
+  if (SUSPEND_STATES.includes(s)) {
     return json({ error: "account suspended; contact billing to restore the store" }, 403);
   }
   return null;
@@ -882,8 +887,8 @@ export default {
       // `suspendMode` tells the PUBLIC site whether to go dark ("full") or stay
       // live ("admin"). Absent when active.
       const _sus = await env.BAGS.get("suspended");
-      data.suspended = _sus === "1" || _sus === "admin";
-      data.suspendMode = _sus === "admin" ? "admin" : (_sus === "1" ? "full" : null);
+      data.suspended = SUSPEND_STATES.includes(_sus);
+      data.suspendMode = _sus === "admin" ? "admin" : (_sus === "client" ? "client" : (_sus === "1" ? "full" : null));
       // PRIVACY: strip buyer PII (sales[].buyerName/buyerPhone/notes, soldTo) for
       // unauthed callers. The storefront only reads sold/price/salePrice/sales.length,
       // never buyer details. The admin sends a Bearer token and gets the full data.
@@ -910,17 +915,20 @@ export default {
     }
 
     // Billing only: flip the suspend flag. Authed by MASTER_TOKEN (not the shop admin token).
-    // body.mode: "admin" = admin-only pause (public site stays live, for real
-    // clients); anything else (default) = "full" pause (public offline overlay,
-    // for prospect/demo sites). Ignored when suspended is false.
+    // body.mode: "admin" = admin-only pause (public site stays live — the usual
+    // choice for a client); "client" = full pause with neutral offline copy (no
+    // sales pitch); anything else (default) = "full" pause with the prospect
+    // one-off pitch. Ignored when suspended is false.
     if (request.method === "POST" && path === "/api/suspend") {
       if (!isMaster(request, env)) return json({ error: "unauthorized" }, 401);
       let body;
       try { body = await request.json(); } catch { return json({ error: "invalid json" }, 400); }
       const suspended = !!body.suspended;
-      const val = suspended ? (body.mode === "admin" ? "admin" : "1") : "0";
+      const val = suspended
+        ? (body.mode === "admin" ? "admin" : (body.mode === "client" ? "client" : "1"))
+        : "0";
       await env.BAGS.put("suspended", val);
-      return json({ ok: true, suspended, mode: suspended ? (val === "admin" ? "admin" : "full") : null });
+      return json({ ok: true, suspended, mode: suspended ? (val === "1" ? "full" : val) : null });
     }
 
     // Public: serve images
