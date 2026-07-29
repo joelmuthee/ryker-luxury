@@ -14,7 +14,8 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
   let items = [];
   let settings = {};
   let suspended = false;
-  let suspendMode = 'full'; // 'full' (prospect pitch) | 'client' (neutral copy) | 'admin' (no overlay)
+  let suspendLevel = 'full';     // 'full' = site offline | 'admin' = site stays live
+  let suspendMode = 'prospect';  // 'prospect' = one-off pitch | 'client' = neutral copy
   let currentAvail = 'all';
   let currentCat = 'all';
   let currentSize = 'all';
@@ -122,12 +123,13 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
       const json = await res.json();
       items = json.bags || [];
       settings = json.settings || {};
-      // An "admin" pause locks the owner's admin but keeps the shop live for
-      // buyers (real clients we don't want to embarrass). "full" and "client"
-      // both go offline; they differ only in the overlay copy. Old worker with
-      // no suspendMode → treat a suspended flag as full (unchanged behaviour).
-      suspendMode = json.suspendMode || 'full';
-      suspended = !!json.suspended && suspendMode !== 'admin';
+      // Two independent things: the LEVEL decides whether buyers are affected at
+      // all (an 'admin' pause freezes only the owner's admin and leaves the shop
+      // live), and the MODE decides the overlay copy on a full pause. Old worker
+      // with neither field → full pause, prospect copy (unchanged behaviour).
+      suspendLevel = json.suspendLevel || 'full';
+      suspendMode = json.suspend_mode || 'prospect';
+      suspended = !!json.suspended && suspendLevel !== 'admin';
     } catch (e) {
       try {
         const res = await fetch('data.json');
