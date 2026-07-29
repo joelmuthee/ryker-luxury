@@ -121,7 +121,11 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
       const json = await res.json();
       items = json.bags || [];
       settings = json.settings || {};
-      suspended = !!json.suspended;
+      // Only the FULL pause takes the public storefront offline. An "admin" pause
+      // locks the owner's admin but keeps the shop live for buyers (real clients
+      // we don't want to embarrass). Old worker with no suspendMode → treat a
+      // suspended flag as full (unchanged behaviour).
+      suspended = !!json.suspended && (json.suspendMode ? json.suspendMode === 'full' : true);
     } catch (e) {
       try {
         const res = await fetch('data.json');

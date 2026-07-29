@@ -34,9 +34,15 @@ const isMaster = (req, env) => {
 // store can be maintained while suspended. Returns a 403 Response when the caller
 // is blocked, or null when the write may proceed. Authoritative gate: the admin
 // UI also blocks these, but this is the real lock the owner can't bypass.
+// suspended KV: "0"/absent = active; "1" = FULL pause (public offline overlay +
+// admin write-locked, for prospect/demo sites); "admin" = ADMIN-ONLY pause (admin
+// write-locked but the public storefront stays fully live, for real clients we
+// don't want to embarrass in front of their buyers). Writes are frozen in BOTH
+// paused states — the difference is only whether the public site goes dark.
 const suspendBlock = async (req, env) => {
   if (isMaster(req, env)) return null;
-  if ((await env.BAGS.get("suspended")) === "1") {
+  const s = await env.BAGS.get("suspended");
+  if (s === "1" || s === "admin") {
     return json({ error: "account suspended; contact billing to restore the store" }, 403);
   }
   return null;
@@ -871,8 +877,13 @@ export default {
       const raw = await env.BAGS.get("data");
       const data = raw ? JSON.parse(raw) : { bags: [], settings: {} };
       // Billing kill-switch: stored in its own KV key so the owner's admin
-      // publishes (which only write "data") can never clear it.
-      data.suspended = (await env.BAGS.get("suspended")) === "1";
+      // publishes (which only write "data") can never clear it. `suspended` is
+      // true in BOTH paused states (so the admin write-locks either way);
+      // `suspendMode` tells the PUBLIC site whether to go dark ("full") or stay
+      // live ("admin"). Absent when active.
+      const _sus = await env.BAGS.get("suspended");
+      data.suspended = _sus === "1" || _sus === "admin";
+      data.suspendMode = _sus === "admin" ? "admin" : (_sus === "1" ? "full" : null);
       // PRIVACY: strip buyer PII (sales[].buyerName/buyerPhone/notes, soldTo) for
       // unauthed callers. The storefront only reads sold/price/salePrice/sales.length,
       // never buyer details. The admin sends a Bearer token and gets the full data.
@@ -899,13 +910,17 @@ export default {
     }
 
     // Billing only: flip the suspend flag. Authed by MASTER_TOKEN (not the shop admin token).
+    // body.mode: "admin" = admin-only pause (public site stays live, for real
+    // clients); anything else (default) = "full" pause (public offline overlay,
+    // for prospect/demo sites). Ignored when suspended is false.
     if (request.method === "POST" && path === "/api/suspend") {
       if (!isMaster(request, env)) return json({ error: "unauthorized" }, 401);
       let body;
       try { body = await request.json(); } catch { return json({ error: "invalid json" }, 400); }
       const suspended = !!body.suspended;
-      await env.BAGS.put("suspended", suspended ? "1" : "0");
-      return json({ ok: true, suspended });
+      const val = suspended ? (body.mode === "admin" ? "admin" : "1") : "0";
+      await env.BAGS.put("suspended", val);
+      return json({ ok: true, suspended, mode: suspended ? (val === "admin" ? "admin" : "full") : null });
     }
 
     // Public: serve images
