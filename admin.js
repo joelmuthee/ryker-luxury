@@ -1647,7 +1647,7 @@ function renderCustomRange() {
   const itemsHtml = rows.length
     ? rows.map(({ bag, s, d, qty, line }) => {
         const bits = [escapeHtml(bag.name)];
-        if (s.size && s.size !== 'One size') bits.push(escapeHtml(s.size));
+        if (s.size && String(s.size).toLowerCase() !== 'one size') bits.push(escapeHtml(s.size));
         if (s.color) bits.push(escapeHtml(s.color));
         const when = oneDay
           ? d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
