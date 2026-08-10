@@ -1623,6 +1623,7 @@ function renderCustomRange() {
   const to = new Date(toV + 'T23:59:59.999');
   if (from > to) { el.innerHTML = '<span style="color:#b00020;font-size:13px;">The "From" date is after the "To" date.</span>'; return; }
   let count = 0, revenue = 0, profit = 0, costKnown = 0, soldWithSale = 0;
+  const rows = []; // the actual items sold, so she can see WHAT sold, not just how much
   bags.forEach(bag => {
     (bag.sales || []).forEach(s => {
       const d = new Date(s.soldAt);
@@ -1631,22 +1632,72 @@ function renderCustomRange() {
         const line = (Number(s.salePrice || bag.price)) * qty;
         count += qty; revenue += line; soldWithSale++;
         if (bag.cost) { profit += line - bag.cost * qty; costKnown++; }
+        rows.push({ bag, s, d, qty, line });
       }
     });
   });
+  rows.sort((a, b) => b.d - a.d);
   const fmtD = v => new Date(v + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   const profitLine = costKnown > 0
     ? `<div class="kpi-profit" style="font-size:12px;color:#2e7d32;font-weight:600;margin-top:4px;">Profit ${fmtKsh(Math.round(profit))}${costKnown < soldWithSale ? ` <span style="color:#999;font-weight:400;">· from ${costKnown}/${soldWithSale} with cost</span>` : ''}</div>`
     : '';
+  // Itemised list of what actually sold. The totals alone don't answer "which
+  // items went out on the 25th?", which is the question the owner actually asks.
+  const oneDay = fromV === toV;
+  const itemsHtml = rows.length
+    ? rows.map(({ bag, s, d, qty, line }) => {
+        const bits = [escapeHtml(bag.name)];
+        if (s.size && s.size !== 'One size') bits.push(escapeHtml(s.size));
+        if (s.color) bits.push(escapeHtml(s.color));
+        const when = oneDay
+          ? d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+          : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+        const who = s.buyerName ? ` <span style="color:var(--ink-faint);">· ${escapeHtml(s.buyerName)}</span>` : '';
+        return `<div class="pos-today-row">
+          <span class="ptr-name">${bits.join(' · ')}${qty > 1 ? ` ×${qty}` : ''}${who}</span>
+          <span class="ptr-amt">${fmtKsh(line)}</span>
+          <span class="ptr-time">${when}</span>
+        </div>`;
+      }).join('')
+    : '<p class="pos-today-empty">Nothing sold on this date.</p>';
+
   el.innerHTML = `
     <div class="kpi-card" style="margin:0;">
-      <div class="kpi-label">${fmtD(fromV)} to ${fmtD(toV)}</div>
+      <div class="kpi-label">${oneDay ? fmtD(fromV) : `${fmtD(fromV)} to ${fmtD(toV)}`}</div>
       <div class="kpi-count">${count} <span class="kpi-unit">units</span></div>
       <div class="kpi-revenue">${fmtKsh(revenue)}</div>${profitLine}
+    </div>
+    <div class="pos-today-list" style="margin-top:14px;">
+      <div class="pos-today-list-head">What sold${rows.length ? ` <span>(${rows.length})</span>` : ''}</div>
+      ${itemsHtml}
     </div>`;
 }
-document.getElementById('rangeFrom')?.addEventListener('change', renderCustomRange);
-document.getElementById('rangeTo')?.addEventListener('change', renderCustomRange);
+// Picking ONE date should be enough to see that day. Mirror the empty box so
+// "what sold on the 25th" is a single tap, not two.
+document.getElementById('rangeFrom')?.addEventListener('change', () => {
+  const f = document.getElementById('rangeFrom'), t = document.getElementById('rangeTo');
+  if (f?.value && t && !t.value) t.value = f.value;
+  renderCustomRange();
+});
+document.getElementById('rangeTo')?.addEventListener('change', () => {
+  const f = document.getElementById('rangeFrom'), t = document.getElementById('rangeTo');
+  if (t?.value && f && !f.value) f.value = t.value;
+  renderCustomRange();
+});
+// Quick day shortcuts — the common questions are "today" and "yesterday".
+document.getElementById('rangeTodayBtn')?.addEventListener('click', () => {
+  const d = todayInputValue();
+  document.getElementById('rangeFrom').value = d;
+  document.getElementById('rangeTo').value = d;
+  renderCustomRange();
+});
+document.getElementById('rangeYesterdayBtn')?.addEventListener('click', () => {
+  const y = new Date(); y.setDate(y.getDate() - 1);
+  const d = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
+  document.getElementById('rangeFrom').value = d;
+  document.getElementById('rangeTo').value = d;
+  renderCustomRange();
+});
 document.getElementById('rangeClearBtn')?.addEventListener('click', () => {
   const f = document.getElementById('rangeFrom'), t = document.getElementById('rangeTo');
   if (f) f.value = ''; if (t) t.value = '';

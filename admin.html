@@ -17,7 +17,7 @@
 <meta name="theme-color" content="#3d2817">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20260720cart">
+<link rel="stylesheet" href="styles.css?v=20260727daysales">
 <script src="https://www.google.com/recaptcha/enterprise.js?render=6LeDBFwpAAAAAJe8ux9-imrqZ2ueRsEtdiWoDDpX" async defer></script>
 </head>
 <body style="background:#f8f6f2;">
@@ -186,8 +186,11 @@
       <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
         <div class="field" style="margin:0;"><label style="font-size:12px;">From</label><input type="date" id="rangeFrom" style="max-width:180px;"></div>
         <div class="field" style="margin:0;"><label style="font-size:12px;">To</label><input type="date" id="rangeTo" style="max-width:180px;"></div>
+        <button class="btn-admin" type="button" id="rangeTodayBtn" style="font-size:12px;padding:7px 12px;">Today</button>
+        <button class="btn-admin" type="button" id="rangeYesterdayBtn" style="font-size:12px;padding:7px 12px;">Yesterday</button>
         <button class="btn-admin" type="button" id="rangeClearBtn" style="font-size:12px;padding:7px 12px;">Clear</button>
       </div>
+      <p style="font-size:12px;color:var(--ink-faint);margin:8px 2px 0;">Pick one date to see everything sold that day, or a From and To for a longer period.</p>
       <div id="rangeResult" style="margin-top:12px;"></div>
     </div>
     <div class="dash-grid">
@@ -1012,6 +1015,6 @@
   </div>
 </div>
 
-<script src="admin.js?v=20260720cart"></script>
+<script src="admin.js?v=20260727daysales"></script>
 </body>
 </html>
