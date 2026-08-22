@@ -213,6 +213,7 @@ async function apiMutateAndPublish(mutate) {
 }
 
 let accountSuspended = false;
+let suspendLevel = null;   // 'admin' = shop still live | 'full' = shop dark
 async function loadData() {
   const res = await fetch(`${API_BASE}/api/bags?_=${Date.now()}`, { headers: { Authorization: `Bearer ${ADMIN_TOKEN}` } });
   const json = await res.json();
@@ -220,7 +221,7 @@ async function loadData() {
   settings = json.settings || {};
   clients = Array.isArray(json.clients) ? json.clients : [];
   expenses = Array.isArray(json.expenses) ? json.expenses : [];
-  accountSuspended = !!json.suspended;
+  accountSuspended = !!json.suspended; suspendLevel = json.suspendLevel || null;
 }
 
 // Owner-facing notice when billing has suspended the store. The public site is
@@ -234,7 +235,11 @@ function renderSuspendedBanner() {
     b.style.cssText = 'position:sticky;top:0;z-index:9000;background:#b00020;color:#fff;padding:12px 16px;text-align:center;font-size:14px;font-weight:600;line-height:1.4;';
     document.body.prepend(b);
   }
-  b.innerHTML = 'Your store is currently offline. Please contact Essence Automations to restore it. You can still view your inventory and sales, but selling, adding stock, syncing from Instagram and other changes are paused until it\'s restored. <a href="https://wa.me/254720615606" style="color:#fff;text-decoration:underline;">Message us</a>';
+  // "admin" freezes the owner but leaves the storefront serving customers, so
+  // saying the store is offline would panic them about sales they are not losing.
+  b.innerHTML = suspendLevel === 'admin'
+    ? "Your subscription is overdue, so your admin is locked. Your shop is still live and customers can still order. You can view your stock and sales, but selling, adding stock and syncing from Instagram are paused until it's restored. <a href=\"https://wa.me/254720615606\" style=\"color:#fff;text-decoration:underline;\">Message us</a>"
+    : 'Your store is currently offline. Please contact Essence Automations to restore it. You can still view your inventory and sales, but selling, adding stock, syncing from Instagram and other changes are paused until it\'s restored. <a href="https://wa.me/254720615606" style="color:#fff;text-decoration:underline;">Message us</a>';
 }
 
 // ====== HELPERS ======
