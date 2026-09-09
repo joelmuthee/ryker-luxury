@@ -20,7 +20,14 @@ binding = "AI"
 #   "10 16 * * *" → 19:10 EAT: IG auto-sync, evening wave
 #   "0 17 * * *"  → 20:00 EAT: daily WhatsApp report (no-ops unless owner enabled it)
 [triggers]
-crons = ["10 6 * * *", "10 10 * * *", "10 16 * * *", "0 17 * * *"]
+# NO IG auto-sync crons (Joel, 2026-09-09). Instagram now requires login so
+# every pull goes through Apify, which bills per post FETCHED, not per new post
+# found. Polling 3x a day costs about Ksh 420 a shop a month to re-read posts
+# that have not changed; the owner tapping "Check for new posts" costs about
+# Ksh 18. Sync is manual-button only. The three waves ("20 6", "20 10",
+# "10 16") were removed here; the daily WhatsApp report cron stays.
+# /api/autosync-run still works if hand-called.
+crons = ["0 17 * * *"]
 
 # Secrets — never committed:
 #   npx wrangler secret put ADMIN_TOKEN
