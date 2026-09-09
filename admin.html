@@ -651,7 +651,7 @@
     <button class="btn-admin" onclick="bulkSetCategory()">Set category</button>
     <button class="btn-admin" onclick="bulkPutOnSale()">Put on sale</button>
     <button class="btn-admin" onclick="bulkRemoveSale()">Remove sale</button>
-    <button class="btn-admin boost-ctrl" onclick="bulkBoost()">⬆ Boost to top</button>
+    <button class="btn-admin boost-ctrl" onclick="bulkBoost()" title="Pins the selected items above everything else for 7 days, then the shop goes back to newest first.">⬆ Boost to top <small style="font-weight:400;opacity:.75;">(7 days)</small></button>
     <button class="btn-admin boost-ctrl" onclick="bulkRemoveBoost()">Remove boost</button>
     <button class="btn-admin danger" onclick="bulkDelete()">Delete</button>
     <button class="btn-admin" onclick="bulkClear()">Clear</button>
@@ -1015,6 +1015,6 @@
   </div>
 </div>
 
-<script src="admin.js?v=20260822banner"></script>
+<script src="admin.js?v=20260909boost7"></script>
 </body>
 </html>

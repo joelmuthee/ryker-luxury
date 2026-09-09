@@ -424,7 +424,17 @@ const API_BASE = 'https://rykerluxury-api.stawisystems.workers.dev';
       // 'default' keeps IG feed order (the natural array order), EXCEPT
       // admin-boosted items float to the top (most recently boosted first).
       // Sold-out items never float — boost is for moving slow stock.
-      const boostRank = it => (!isSoldOut(it) && it.boostedAt) ? new Date(it.boostedAt).getTime() : 0;
+      // A boost lasts 7 days. Without an expiry a promo set once keeps
+      // outranking new stock forever: on ThriftLux five bags boosted on
+      // 2026-07-30 were still pinned above the September drop six weeks later,
+      // so the shop opened on a May item and looked nothing like Instagram.
+      const BOOST_DAYS = 7;
+      const boostRank = (it) => {
+        if (isSoldOut(it) || !it.boostedAt) return 0;
+        const t = new Date(it.boostedAt).getTime();
+        if (!t) return 0;
+        return (Date.now() - t) > BOOST_DAYS * 86400000 ? 0 : t;
+      };
       filtered.sort((a, b) => boostRank(b) - boostRank(a));
     }
 

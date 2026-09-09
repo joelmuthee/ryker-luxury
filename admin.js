@@ -2002,7 +2002,9 @@ function renderList() {
           (bag.salePrice > 0 && bag.salePrice < bag.price)
             ? `<s style="color:#999;font-weight:400;">${fmtKsh(bag.price)}</s> <span style="color:#c0392b;font-weight:700;">${fmtKsh(bag.salePrice)}</span> <span style="color:#c0392b;font-weight:700;">· SALE</span>`
             : fmtKsh(bag.price)
-        }<span class="admin-card-mobile-stock"> · ${units} in stock</span>${(!isSoldOut(bag) && bag.boostedAt) ? ' · <span style="color:#8a6d3b;font-weight:700;">⬆ BOOSTED</span>' : ''}</div>
+        }<span class="admin-card-mobile-stock"> · ${units} in stock</span>${(!isSoldOut(bag) && bag.boostedAt) ? (boostDaysLeft(bag) > 0
+          ? ` · <span style="color:#8a6d3b;font-weight:700;">⬆ BOOSTED · ${boostDaysLeft(bag)} day${boostDaysLeft(bag) === 1 ? '' : 's'} left</span>`
+          : ' · <span style="color:#999;font-weight:700;">⬆ boost expired</span>') : ''}</div>
         <div class="admin-card-stock">${units} in stock · ${sold} sold | ${stockSummary}</div>
         ${addedIso ? `<div class="admin-card-added" title="Added ${new Date(addedIso).toLocaleString('en-KE')}">Added ${relTime(addedIso)}</div>` : ''}
         <div class="admin-card-actions">
@@ -2353,6 +2355,17 @@ window.bulkRemoveSale = async () => {
 // Floats selected items to the top of the default Featured order on the public
 // site. Used for moving slow / old stock. Most recently boosted first. Sold-out
 // items (computed: stock all-zero + ≥1 sale) cannot be boosted.
+// A boost lasts 7 days on the public site, so the admin has to say so too: an
+// owner looking at a permanent "BOOSTED" tag on a six-week-old promo has no way
+// to know it stopped doing anything.
+const BOOST_DAYS = 7;
+function boostDaysLeft(b) {
+  if (!b || isSoldOut(b) || !b.boostedAt) return 0;
+  const t = new Date(b.boostedAt).getTime();
+  if (!t) return 0;
+  return Math.ceil((BOOST_DAYS * 86400000 - (Date.now() - t)) / 86400000);
+}
+
 window.bulkBoost = async () => {
   if (!BOOST_ENABLED) return;
   if (!bulkSelected.size) return;
