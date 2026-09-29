@@ -968,6 +968,7 @@ export default {
       const _sus = await env.BAGS.get("suspended");
       data.suspended = SUSPEND_LEVELS.includes(_sus);
       data.suspendLevel = _sus === "admin" ? "admin" : (_sus === "1" ? "full" : null);
+      data.suspendDue = SUSPEND_LEVELS.includes(_sus) ? ((await env.BAGS.get("suspend_due")) || null) : null;
       data.suspend_mode = (await env.BAGS.get("suspend_mode")) || "prospect";
       // PRIVACY: strip buyer PII (sales[].buyerName/buyerPhone/notes, soldTo) for
       // unauthed callers. The storefront only reads sold/price/salePrice/sales.length,
@@ -1008,6 +1009,10 @@ export default {
       if (body.mode === "client" || body.mode === "prospect") await env.BAGS.put("suspend_mode", body.mode);
       const suspended = !!body.suspended;
       const adminOnly = body.level === "admin" || body.mode === "admin";
+      // The billing due date the owner missed, shown on their admin banner. Only
+      // written by a pause that carries one; a restore always clears it.
+      if (!suspended) await env.BAGS.delete("suspend_due");
+      else if (/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(body.due || ""))) await env.BAGS.put("suspend_due", body.due);
       const val = suspended ? (adminOnly ? "admin" : "1") : "0";
       await env.BAGS.put("suspended", val);
       const mode = (await env.BAGS.get("suspend_mode")) || "prospect";
