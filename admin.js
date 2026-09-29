@@ -216,6 +216,7 @@ let accountSuspended = false;
 let suspendLevel = null;   // 'admin' = shop still live | 'full' = shop dark
 let suspendDue = null;     // billing due date the owner missed, YYYY-MM-DD
 let suspendOwed = null;    // what billing says they owe, in Ksh
+let billingNotice = null;  // { due, amount } pushed by billing, for the pre-due reminder
 async function loadData() {
   const res = await fetch(`${API_BASE}/api/bags?_=${Date.now()}`, { headers: { Authorization: `Bearer ${ADMIN_TOKEN}` } });
   const json = await res.json();
@@ -223,12 +224,41 @@ async function loadData() {
   settings = json.settings || {};
   clients = Array.isArray(json.clients) ? json.clients : [];
   expenses = Array.isArray(json.expenses) ? json.expenses : [];
-  accountSuspended = !!json.suspended; suspendLevel = json.suspendLevel || null; suspendDue = json.suspendDue || null; suspendOwed = json.suspendOwed || null;
+  accountSuspended = !!json.suspended; suspendLevel = json.suspendLevel || null; suspendDue = json.suspendDue || null; suspendOwed = json.suspendOwed || null; billingNotice = json.billingNotice || null;
 }
 
 // Owner-facing notice when billing has suspended the store. The public site is
 // dark; this tells the owner why and how to restore (they can't unflip it).
+// Heads-up from 2 days before the due date billing pushed, through the grace
+// days after it, until the bill is paid (billing then pushes the next date) or
+// the account is paused (the red banner takes over). Amber: nothing is locked yet.
+function renderBillingReminder() {
+  let r = document.getElementById('billingReminder');
+  const n = billingNotice;
+  let days = null;
+  if (n && n.due) {
+    const t = new Date();
+    const today = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+    const [y, m, d] = n.due.split('-').map(Number);
+    days = Math.round((new Date(y, m - 1, d) - today) / 86400000);
+  }
+  if (accountSuspended || days === null || days > 2) { if (r) r.remove(); return; }
+  if (!r) {
+    r = document.createElement('div');
+    r.id = 'billingReminder';
+    r.style.cssText = 'position:sticky;top:0;z-index:9000;background:#fff4e0;color:#7a4b00;border-bottom:1px solid #f0c77a;padding:12px 16px;text-align:center;font-size:14px;font-weight:600;line-height:1.4;';
+    document.body.prepend(r);
+  }
+  const bill = n.amount ? 'Your website bill of Ksh ' + Number(n.amount).toLocaleString('en-KE') : 'Your website bill';
+  const date = n.due.split('-').reverse().join('/');
+  const line = days > 0 ? bill + ' is due on ' + date + '. Kindly pay by then to avoid interruption. '
+    : days === 0 ? bill + ' is due today. Kindly pay today to avoid interruption. '
+    : bill + ' was due on ' + date + '. Kindly settle it to avoid interruption. ';
+  r.innerHTML = line + '<a href="https://wa.me/254720615606" style="color:#7a4b00;text-decoration:underline;">Message us</a>';
+}
+
 function renderSuspendedBanner() {
+  renderBillingReminder();
   let b = document.getElementById('suspendedBanner');
   if (!accountSuspended) { if (b) b.remove(); return; }
   if (!b) {

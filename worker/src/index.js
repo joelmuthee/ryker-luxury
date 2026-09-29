@@ -975,6 +975,9 @@ export default {
       // unauthed callers. The storefront only reads sold/price/salePrice/sales.length,
       // never buyer details. The admin sends a Bearer token and gets the full data.
       const admin = isAuthed(request, env);
+      // What the owner owes us is theirs to see, not their customers'.
+      if (!admin) { delete data.suspendDue; delete data.suspendOwed; }
+      else data.billingNotice = JSON.parse((await env.BAGS.get("billing_notice")) || "null");
       if (!admin && Array.isArray(data.bags)) {
         data.bags = data.bags.map(b => {
           if (!b || typeof b !== "object") return b;
@@ -994,6 +997,21 @@ export default {
       // Expenses are the owner's private books (ad spend, costs) — never public.
       if (!admin && data.expenses) delete data.expenses;
       return json(data, 200, admin ? { "Cache-Control": "no-store" } : { "Cache-Control": "public, max-age=10" });
+    }
+
+    // Billing only: the client's next due date and amount, pushed by the billing
+    // dashboard whenever they change. The admin counts down to a reminder from 2
+    // days out. Separate from the kill-switch, which this never touches.
+    if (request.method === "POST" && path === "/api/billing-notice") {
+      if (!isMaster(request, env)) return json({ error: "unauthorized" }, 401);
+      let nb;
+      try { nb = await request.json(); } catch { return json({ error: "invalid json" }, 400); }
+      if (/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(nb.due || ""))) {
+        await env.BAGS.put("billing_notice", JSON.stringify({ due: nb.due, amount: Math.round(Number(nb.amount) || 0) }));
+      } else {
+        await env.BAGS.delete("billing_notice");
+      }
+      return json({ ok: true });
     }
 
     // Billing only: flip the suspend flag. Authed by MASTER_TOKEN (not the shop admin token).
