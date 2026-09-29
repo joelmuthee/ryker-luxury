@@ -215,6 +215,7 @@ async function apiMutateAndPublish(mutate) {
 let accountSuspended = false;
 let suspendLevel = null;   // 'admin' = shop still live | 'full' = shop dark
 let suspendDue = null;     // billing due date the owner missed, YYYY-MM-DD
+let suspendOwed = null;    // what billing says they owe, in Ksh
 async function loadData() {
   const res = await fetch(`${API_BASE}/api/bags?_=${Date.now()}`, { headers: { Authorization: `Bearer ${ADMIN_TOKEN}` } });
   const json = await res.json();
@@ -222,7 +223,7 @@ async function loadData() {
   settings = json.settings || {};
   clients = Array.isArray(json.clients) ? json.clients : [];
   expenses = Array.isArray(json.expenses) ? json.expenses : [];
-  accountSuspended = !!json.suspended; suspendLevel = json.suspendLevel || null; suspendDue = json.suspendDue || null;
+  accountSuspended = !!json.suspended; suspendLevel = json.suspendLevel || null; suspendDue = json.suspendDue || null; suspendOwed = json.suspendOwed || null;
 }
 
 // Owner-facing notice when billing has suspended the store. The public site is
@@ -241,9 +242,14 @@ function renderSuspendedBanner() {
   // Name the date they missed when billing sent one. "Overdue" on its own
   // invites a "since when?" reply; the date answers it first.
   const dueTxt = suspendDue ? suspendDue.split('-').reverse().join('/') : '';
+  const owedTxt = suspendOwed ? 'Ksh ' + Number(suspendOwed).toLocaleString('en-KE') : '';
+  const lead = owedTxt && dueTxt ? 'Your website bill of ' + owedTxt + ' has been due since ' + dueTxt
+    : owedTxt ? 'Your website bill of ' + owedTxt + ' is overdue'
+    : dueTxt ? 'Your payment was due on ' + dueTxt
+    : '';
   b.innerHTML = suspendLevel === 'admin'
-    ? (dueTxt ? "Your payment was due on " + dueTxt + ", so your admin is locked. " : "Your subscription is overdue, so your admin is locked. ") + "Your shop is still live and customers can still order. You can view your stock and sales, but selling, adding stock and syncing from Instagram are paused until it's restored. <a href=\"https://wa.me/254720615606\" style=\"color:#fff;text-decoration:underline;\">Message us</a>"
-    : (dueTxt ? 'Your payment was due on ' + dueTxt + '. ' : '') + 'Your store is currently offline. Please contact Essence Automations to restore it. You can still view your inventory and sales, but selling, adding stock, syncing from Instagram and other changes are paused until it\'s restored. <a href="https://wa.me/254720615606" style="color:#fff;text-decoration:underline;">Message us</a>';
+    ? (lead ? lead + ", so your admin is locked. " : "Your subscription is overdue, so your admin is locked. ") + "Your shop is still live and customers can still order. You can view your stock and sales, but selling, adding stock and syncing from Instagram are paused until it's restored. <a href=\"https://wa.me/254720615606\" style=\"color:#fff;text-decoration:underline;\">Message us</a>"
+    : (lead ? lead + '. ' : '') + 'Your store is currently offline. Please contact Essence Automations to restore it. You can still view your inventory and sales, but selling, adding stock, syncing from Instagram and other changes are paused until it\'s restored. <a href="https://wa.me/254720615606" style="color:#fff;text-decoration:underline;">Message us</a>';
 }
 
 // ====== HELPERS ======
