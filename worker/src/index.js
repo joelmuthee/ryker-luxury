@@ -996,6 +996,14 @@ export default {
       if (!admin && data.clients) delete data.clients;
       // Expenses are the owner's private books (ad spend, costs) — never public.
       if (!admin && data.expenses) delete data.expenses;
+      // "Asked for" log (what customers wanted and the shop didn't have) is the
+      // owner's buying notes, never public.
+      if (!admin && data.demand) delete data.demand;
+      // Loyalty redemptions carry customer names and phone numbers. The public
+      // site never reads them; strip them so the first redemption can't leak.
+      if (!admin && data.settings && data.settings.loyalty && Array.isArray(data.settings.loyalty.redemptions)) {
+        data.settings = { ...data.settings, loyalty: { ...data.settings.loyalty, redemptions: [] } };
+      }
       return json(data, 200, admin ? { "Cache-Control": "no-store" } : { "Cache-Control": "public, max-age=10" });
     }
 
@@ -1280,6 +1288,15 @@ export default {
       if (Array.isArray(body.clients)) payload.clients = body.clients;
       // Operating expenses (ad spend, packaging, etc.) — admin-only records ledger.
       if (Array.isArray(body.expenses)) payload.expenses = body.expenses;
+      // "Asked for" log. An admin tab opened before this key existed saves
+      // without it, so keep what is stored rather than wiping it.
+      if (Array.isArray(body.demand)) payload.demand = body.demand;
+      else {
+        try {
+          const prev = JSON.parse((await env.BAGS.get("data")) || "{}");
+          if (Array.isArray(prev.demand)) payload.demand = prev.demand;
+        } catch (_) {}
+      }
       await env.BAGS.put("data", JSON.stringify(payload));
       return json({ ok: true, count: body.bags.length, sets: payload.sets?.length || 0 });
     }
