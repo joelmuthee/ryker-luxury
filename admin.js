@@ -1885,6 +1885,28 @@ let invFilter = 'attention'; // 'attention' | 'all'
 let invShowAll = false;       // false = cap at INV_PAGE_SIZE
 const INV_PAGE_SIZE = 15;
 
+// Excel download of the catalog: name, category, price, units in stock and a
+// photo link per item. CSV with a UTF-8 BOM so Excel shows names correctly; the
+// photo column is a HYPERLINK formula so each row opens its current picture.
+function exportStockList() {
+  const esc = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const abs = u => !u ? '' : (/^https?:/i.test(u) ? u : new URL(u, location.origin).href);
+  const rows = bags.slice()
+    .sort((a, b) => (a.category || '').localeCompare(b.category || '') || (a.name || '').localeCompare(b.name || ''))
+    .map(b => {
+      const img = abs(b.image);
+      return [esc(b.name || ''), esc(b.category || ''), esc(b.price || ''), esc(totalStock(b)),
+        img ? esc('=HYPERLINK("' + img.replace(/"/g, '') + '","View photo")') : '""', esc(img)].join(',');
+    });
+  const csv = String.fromCharCode(0xFEFF) + ['Product name,Category,Price (Ksh),In stock,Photo,Photo link'].concat(rows).join(String.fromCharCode(13, 10));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'ryker-luxury-products-' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+document.getElementById('stockExportBtn')?.addEventListener('click', exportStockList);
+
 function renderInventory() {
   let totalItems = bags.length;
   let totalUnits = 0, totalValue = 0, lowStock = 0, outOfStock = 0;
