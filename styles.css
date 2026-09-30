@@ -1679,3 +1679,8 @@ body.role-assistant #staffAccessBtn { display: none !important; }
 .pos-today-row .ptr-name { flex: 1 1 auto; font-weight: 600; color: var(--ink); }
 .pos-today-row .ptr-amt { flex: 0 0 auto; font-weight: 700; }
 .pos-today-row .ptr-time { flex: 0 0 auto; color: #999; font-size: 12px; min-width: 42px; text-align: right; }
+
+/* Available-size chips on All-items cards: visible at every width, because the
+   owner checks sizes on her phone while replying to customers. */
+.admin-card-sizes { margin-top: 6px; }
+.admin-card-sizes .stock-cell { font-size: 12px; padding: 3px 8px; }
