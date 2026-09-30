@@ -2019,17 +2019,17 @@ function renderInventory() {
 
     return `
     <tr>
-      <td><img class="item-img" src="${bag.image}" alt="${escapeHtml(bag.name)}"></td>
-      <td>
+      <td class="inv-c-img"><img class="item-img" src="${bag.image}" alt="${escapeHtml(bag.name)}"></td>
+      <td class="inv-c-item">
         <div style="font-weight:600;font-size:13px;">${escapeHtml(bag.name)}</div>
         <div style="font-size:11px;color:#999;margin-top:2px;">${soldUnits} sold<span class="client-money"> · ${fmtKsh(totalRevenue(bag))} revenue</span></div>
       </td>
-      <td style="font-size:13px;">${escapeHtml(bag.category || '—')}</td>
-      <td style="font-size:13px;font-weight:600;">${fmtKsh(bag.price)}${costLine}</td>
-      <td><div class="stock-cells">${stockCells}</div></td>
-      <td style="font-weight:700;font-size:14px;">${units}</td>
-      <td><span class="stock-pill ${statusCls}">${statusLabel}</span></td>
-      <td>
+      <td class="inv-c-cat" style="font-size:13px;">${escapeHtml(bag.category || '—')}</td>
+      <td class="inv-c-price" style="font-size:13px;font-weight:600;">${fmtKsh(bag.price)}${costLine}</td>
+      <td class="inv-c-sizes"><div class="stock-cells">${stockCells}</div></td>
+      <td class="inv-c-total" style="font-weight:700;font-size:14px;">${units}</td>
+      <td class="inv-c-status"><span class="stock-pill ${statusCls}">${statusLabel}</span></td>
+      <td class="inv-c-act">
         <button class="restock-btn" onclick="openRestockModal('${bag.id}')">+ Restock</button>
       </td>
     </tr>`;

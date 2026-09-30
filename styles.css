@@ -1684,3 +1684,40 @@ body.role-assistant #staffAccessBtn { display: none !important; }
    owner checks sizes on her phone while replying to customers. */
 .admin-card-sizes { margin-top: 6px; }
 .admin-card-sizes .stock-cell { font-size: 12px; padding: 3px 8px; }
+
+/* Inventory on a phone: every row becomes a card, never a sideways scroller.
+   The table had min-width 640px, so on a phone "Stock by size" sat past the
+   right edge inside its own scroll box. The page itself never scrolled, so a
+   page-level check passed while the one column the owner opens this for was
+   hidden. Sizes get a full-width line of their own. */
+@media (max-width: 760px) {
+  .inv-table-wrap { max-height: none; overflow: visible; border: none; }
+  .inv-table { min-width: 0; width: 100%; }
+  .inv-table thead { display: none; }
+  .inv-table, .inv-table tbody { display: block; }
+  .inv-table tr {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "img item  item"
+      "img cat   price"
+      "sz  sz    sz"
+      "st  total act";
+    column-gap: 10px; row-gap: 6px; align-items: center;
+    padding: 12px; margin-bottom: 10px;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--bg-card, #fff);
+  }
+  .inv-table td { display: block; padding: 0; border: none; min-width: 0; }
+  .inv-table tr:hover td { background: none; }
+  .inv-table .item-img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; }
+  .inv-c-img { grid-area: img; align-self: start; }
+  .inv-c-item { grid-area: item; }
+  .inv-c-cat { grid-area: cat; color: var(--ink-soft); font-size: 12px !important; }
+  .inv-c-price { grid-area: price; text-align: right; }
+  .inv-c-sizes { grid-area: sz; }
+  .inv-c-sizes .stock-cell { font-size: 12px; padding: 3px 8px; }
+  .inv-c-total { grid-area: total; font-size: 13px !important; }
+  .inv-c-total::after { content: " in stock"; font-weight: 400; color: var(--ink-soft); }
+  .inv-c-status { grid-area: st; }
+  .inv-c-act { grid-area: act; text-align: right; }
+}
