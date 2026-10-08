@@ -1,0 +1,4 @@
+# Private files must never be served (2026-10-08). Pages publishes the whole folder, so
+# notes and the worker source (which holds the fallback owner password) went public.
+# Redirect rules run before static assets on Pages.
+/worker/* / 301
